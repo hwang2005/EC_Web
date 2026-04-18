@@ -48,3 +48,26 @@ export interface Order {
   orderDate: string;
   estimatedDelivery: string;
 }
+
+export interface Review {
+  id: string;
+  productId: string;
+  author: string;
+  rating: number;
+  comment: string;
+  date: string;
+}
+
+export interface UserProfile {
+  name: string;
+  email: string;
+  phone: string;
+}
+
+export interface RegisteredUser {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  role: "consumer" | "seller";
+}

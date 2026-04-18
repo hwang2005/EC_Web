@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useShop } from "../context/ShopContext";
+import { useAuth } from "../context/AuthContext";
 import { DELIVERY_OPTIONS, PAYMENT_METHODS } from "../data/products";
 import { ShippingAddress, DeliveryOption, Order } from "../types";
 import { CreditCard, Truck, ShieldCheck, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 export function Checkout() {
+  const { role } = useAuth();
   const { cart, getCartTotal, placeOrder } = useShop();
   const navigate = useNavigate();
   
@@ -38,6 +40,11 @@ export function Checkout() {
   const tax = subtotal * 0.1;
   const deliveryFee = selectedDelivery.price;
   const total = subtotal + tax + deliveryFee;
+
+  if (role !== "consumer") {
+    navigate("/auth");
+    return null;
+  }
 
   if (cart.length === 0) {
     navigate("/cart");

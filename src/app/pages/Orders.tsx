@@ -1,9 +1,31 @@
 import { Link } from "react-router";
 import { useShop } from "../context/ShopContext";
+import { useAuth } from "../context/AuthContext";
 import { Package, Truck, CheckCircle, XCircle, Clock } from "lucide-react";
 
 export function Orders() {
+  const { role } = useAuth();
   const { orders } = useShop();
+
+  if (role !== "consumer") {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="text-center">
+          <Package className="w-24 h-24 text-gray-300 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Đăng nhập để xem đơn hàng</h2>
+          <p className="text-gray-600 mb-8">
+            Lịch sử mua hàng chỉ dành cho khách hàng đã đăng nhập.
+          </p>
+          <Link
+            to="/auth"
+            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Đăng nhập khách hàng
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {

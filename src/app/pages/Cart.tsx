@@ -1,11 +1,41 @@
 import { Link, useNavigate } from "react-router";
 import { useShop } from "../context/ShopContext";
+import { useAuth } from "../context/AuthContext";
 import { Trash2, Plus, Minus, ShoppingBag, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 export function Cart() {
+  const { role } = useAuth();
   const { cart, removeFromCart, updateCartQuantity, getCartTotal } = useShop();
   const navigate = useNavigate();
+
+  if (role !== "consumer") {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="text-center">
+          <ShoppingBag className="w-24 h-24 text-gray-300 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Đăng nhập để sử dụng giỏ hàng</h2>
+          <p className="text-gray-600 mb-8">
+            Khách có thể xem sản phẩm, nhưng chỉ khách hàng đã đăng nhập mới được mua hàng.
+          </p>
+          <div className="flex justify-center gap-4">
+            <Link
+              to="/products"
+              className="inline-flex items-center gap-2 border border-border px-6 py-3 rounded-lg hover:bg-muted transition-colors"
+            >
+              Xem sản phẩm
+            </Link>
+            <Link
+              to="/auth"
+              className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Đăng nhập khách hàng
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleRemove = (productId: string, productName: string) => {
     removeFromCart(productId);

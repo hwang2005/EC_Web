@@ -1,26 +1,19 @@
-import { useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { ShoppingCart, Package, Home, Grid3x3, Sprout, BarChart3, LogOut } from "lucide-react";
+import { ShoppingCart, Package, Home, Grid3x3, Sprout, BarChart3, LogOut, Heart, UserCircle, Phone } from "lucide-react";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
 import { Chatbot } from "./Chatbot";
 
 export function Layout() {
-  const { getCartCount } = useShop();
+  const { getCartCount, wishlist } = useShop();
   const { role, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const cartCount = getCartCount();
 
-  useEffect(() => {
-    if (!role) {
-      navigate("/auth");
-    }
-  }, [role, navigate]);
-
   const isActive = (path: string) => location.pathname === path;
-
-  if (!role) return null;
+  const isCustomer = role === "consumer";
+  const isSeller = role === "seller";
 
   return (
     <div className="min-h-screen bg-background">
@@ -37,7 +30,7 @@ export function Layout() {
             </Link>
 
             <nav className="hidden md:flex items-center gap-6">
-              {role === "consumer" && (
+              {!isSeller && (
                 <>
                   <Link
                     to="/"
@@ -61,20 +54,51 @@ export function Layout() {
                     <Grid3x3 className="w-4 h-4" />
                     Sản Phẩm
                   </Link>
+                  {isCustomer && (
+                    <>
+                      <Link
+                        to="/wishlist"
+                        className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors relative ${
+                          isActive("/wishlist")
+                            ? "text-primary bg-accent"
+                            : "text-foreground hover:text-primary hover:bg-muted"
+                        }`}
+                      >
+                        <Heart className="w-4 h-4" />
+                        Yêu Thích
+                        {wishlist.length > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-destructive text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                            {wishlist.length}
+                          </span>
+                        )}
+                      </Link>
+                      <Link
+                        to="/orders"
+                        className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
+                          isActive("/orders")
+                            ? "text-primary bg-accent"
+                            : "text-foreground hover:text-primary hover:bg-muted"
+                        }`}
+                      >
+                        <Package className="w-4 h-4" />
+                        Đơn Hàng
+                      </Link>
+                    </>
+                  )}
                   <Link
-                    to="/orders"
+                    to="/contact"
                     className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
-                      isActive("/orders")
+                      isActive("/contact")
                         ? "text-primary bg-accent"
                         : "text-foreground hover:text-primary hover:bg-muted"
                     }`}
                   >
-                    <Package className="w-4 h-4" />
-                    Đơn Hàng
+                    <Phone className="w-4 h-4" />
+                    Liên Hệ
                   </Link>
                 </>
               )}
-              {role === "seller" && (
+              {isSeller && (
                 <>
                   <Link
                     to="/"
@@ -102,14 +126,14 @@ export function Layout() {
               )}
             </nav>
 
-            <div className="flex items-center gap-4">
-              {role === "consumer" && (
+            <div className="flex items-center gap-3">
+              {isCustomer && (
                 <Link
                   to="/cart"
                   className="relative flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   <ShoppingCart className="w-5 h-5" />
-                  <span>Giỏ Hàng</span>
+                  <span className="hidden sm:inline">Giỏ Hàng</span>
                   {cartCount > 0 && (
                     <span className="absolute -top-2 -right-2 bg-destructive text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
                       {cartCount}
@@ -117,18 +141,43 @@ export function Layout() {
                   )}
                 </Link>
               )}
-              
-              <button
-                onClick={() => {
-                  logout();
-                  navigate("/auth");
-                }}
-                className="flex items-center gap-2 px-3 py-2 text-muted-foreground hover:text-primary hover:bg-muted rounded-md transition-colors"
-                title="Đổi Vai Trò"
-              >
-                <LogOut className="w-5 h-5" />
-                <span className="hidden sm:inline">Đăng Xuất</span>
-              </button>
+
+              {role ? (
+                <>
+                  <Link
+                    to="/profile"
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
+                      isActive("/profile")
+                        ? "text-primary bg-accent"
+                        : "text-muted-foreground hover:text-primary hover:bg-muted"
+                    }`}
+                    title="Tài Khoản"
+                  >
+                    <UserCircle className="w-5 h-5" />
+                    <span className="hidden sm:inline text-sm">Tài Khoản</span>
+                  </Link>
+
+                  <button
+                    onClick={() => {
+                      logout();
+                      navigate("/");
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 text-muted-foreground hover:text-primary hover:bg-muted rounded-md transition-colors"
+                    title="Đăng Xuất"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    <span className="hidden sm:inline">Đăng Xuất</span>
+                  </button>
+                </>
+              ) : (
+                <Link
+                  to="/auth"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  <UserCircle className="w-5 h-5" />
+                  <span className="hidden sm:inline">Đăng Nhập</span>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -159,16 +208,18 @@ export function Layout() {
               <h3 className="font-semibold mb-4">Mua Sắm</h3>
               <ul className="space-y-2 text-sm text-gray-400">
                 <li><Link to="/products" className="hover:text-white">Tất Cả Sản Phẩm</Link></li>
-                <li><Link to="/cart" className="hover:text-white">Giỏ Hàng</Link></li>
-                <li><Link to="/orders" className="hover:text-white">Lịch Sử Đơn Hàng</Link></li>
+                {isCustomer && <li><Link to="/cart" className="hover:text-white">Giỏ Hàng</Link></li>}
+                {isCustomer && <li><Link to="/wishlist" className="hover:text-white">Sản Phẩm Yêu Thích</Link></li>}
+                {isCustomer && <li><Link to="/orders" className="hover:text-white">Lịch Sử Đơn Hàng</Link></li>}
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold mb-4">Hỗ Trợ</h3>
+              <h3 className="font-semibold mb-4">Tài Khoản</h3>
               <ul className="space-y-2 text-sm text-gray-400">
+                {role && <li><Link to="/profile" className="hover:text-white">Tài Khoản Của Tôi</Link></li>}
+                {!role && <li><Link to="/auth" className="hover:text-white">Đăng Nhập / Đăng Ký</Link></li>}
+                <li><Link to="/contact" className="hover:text-white">Liên Hệ</Link></li>
                 <li><a href="#" className="hover:text-white">Trung Tâm Trợ Giúp</a></li>
-                <li><a href="#" className="hover:text-white">Thông Tin Giao Hàng</a></li>
-                <li><a href="#" className="hover:text-white">Chính Sách Đổi Trả</a></li>
               </ul>
             </div>
             <div>
@@ -176,6 +227,7 @@ export function Layout() {
               <ul className="space-y-2 text-sm text-gray-400">
                 <li><a href="#" className="hover:text-white">Bảo Mật</a></li>
                 <li><a href="#" className="hover:text-white">Điều Khoản Dịch Vụ</a></li>
+                <li><a href="#" className="hover:text-white">Chính Sách Đổi Trả</a></li>
                 <li><a href="#" className="hover:text-white">Thanh Toán An Toàn</a></li>
               </ul>
             </div>

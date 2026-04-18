@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { useShop } from "../context/ShopContext";
-import { Search, Filter, Tag } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { Search, Filter, Tag, Heart } from "lucide-react";
 import { CustomerTierSelector } from "../components/CustomerTierSelector";
 import { CUSTOMER_TIERS } from "../data/products";
+import { toast } from "sonner";
 
 export function Products() {
-  const { products, customerTier, getPersonalizedPrice } = useShop();
+  const { role } = useAuth();
+  const { products, customerTier, getPersonalizedPrice, isInWishlist, addToWishlist, removeFromWishlist } = useShop();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Tất Cả");
   const [sortBy, setSortBy] = useState("name");
@@ -40,9 +43,11 @@ export function Products() {
         Khám phá các sản phẩm nông sản Việt Nam chất lượng cao
       </p>
 
-      <div className="mb-8">
-        <CustomerTierSelector />
-      </div>
+      {role === "consumer" && (
+        <div className="mb-8">
+          <CustomerTierSelector />
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm p-4 mb-8 border border-border">
@@ -99,6 +104,23 @@ export function Products() {
         {filteredProducts.map((product) => {
           const personalizedPrice = getPersonalizedPrice(product.price);
           const hasDiscount = customerTier !== "standard";
+          const inWishlist = isInWishlist(product.id);
+
+          const handleToggleWishlist = (e: React.MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (role !== "consumer") {
+              toast.error("Vui lòng đăng nhập tài khoản khách hàng để dùng danh sách yêu thích");
+              return;
+            }
+            if (inWishlist) {
+              removeFromWishlist(product.id);
+              toast.success(`${product.name} đã xóa khỏi yêu thích`);
+            } else {
+              addToWishlist(product);
+              toast.success(`${product.name} đã thêm vào yêu thích`);
+            }
+          };
 
           return (
             <Link
@@ -106,12 +128,23 @@ export function Products() {
               to={`/products/${product.id}`}
               className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow group border border-border"
             >
-              <div className="aspect-square overflow-hidden bg-muted">
+              <div className="aspect-square overflow-hidden bg-muted relative">
                 <img
                   src={product.image}
                   alt={product.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                 />
+                <button
+                  onClick={handleToggleWishlist}
+                  title={role === "consumer" ? "Yêu thích" : "Đăng nhập để thêm vào yêu thích"}
+                  className={`absolute top-3 right-3 p-2 rounded-full shadow-md transition-colors ${
+                    inWishlist
+                      ? "bg-red-50 text-red-500"
+                      : "bg-white/90 text-muted-foreground hover:text-red-500"
+                  }`}
+                >
+                  <Heart className={`w-5 h-5 ${inWishlist ? "fill-current" : ""}`} />
+                </button>
               </div>
               <div className="p-4">
                 <div className="flex justify-between items-start mb-2">

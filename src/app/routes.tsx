@@ -8,6 +8,9 @@ import { Checkout } from "./pages/Checkout";
 import { Orders } from "./pages/Orders";
 import { Admin } from "./pages/Admin";
 import { Auth } from "./pages/Auth";
+import { Wishlist } from "./pages/Wishlist";
+import { Profile } from "./pages/Profile";
+import { Contact } from "./pages/Contact";
 import { NotFound } from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -25,6 +28,9 @@ export const router = createBrowserRouter([
       { path: "cart", Component: Cart },
       { path: "checkout", Component: Checkout },
       { path: "orders", Component: Orders },
+      { path: "wishlist", Component: Wishlist },
+      { path: "profile", Component: Profile },
+      { path: "contact", Component: Contact },
       { path: "admin", Component: Admin },
       { path: "*", Component: NotFound },
     ],

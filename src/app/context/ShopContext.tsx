@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { Product, CartItem, Order } from "../types";
+import { Product, CartItem, Order, Review } from "../types";
 import { PRODUCTS, CustomerTier } from "../data/products";
 
 interface ShopContextType {
   products: Product[];
   cart: CartItem[];
   orders: Order[];
+  wishlist: Product[];
+  reviews: Review[];
   customerTier: CustomerTier;
   addToCart: (product: Product, quantity?: number) => void;
   removeFromCart: (productId: string) => void;
@@ -19,6 +21,11 @@ interface ShopContextType {
   getCartCount: () => number;
   setCustomerTier: (tier: CustomerTier) => void;
   getPersonalizedPrice: (price: number) => number;
+  addToWishlist: (product: Product) => void;
+  removeFromWishlist: (productId: string) => void;
+  isInWishlist: (productId: string) => boolean;
+  addReview: (review: Review) => void;
+  getProductReviews: (productId: string) => Review[];
 }
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
@@ -39,6 +46,16 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     return stored ? JSON.parse(stored) : [];
   });
 
+  const [wishlist, setWishlist] = useState<Product[]>(() => {
+    const stored = localStorage.getItem("wishlist");
+    return stored ? JSON.parse(stored) : [];
+  });
+
+  const [reviews, setReviews] = useState<Review[]>(() => {
+    const stored = localStorage.getItem("reviews");
+    return stored ? JSON.parse(stored) : [];
+  });
+
   const [customerTier, setCustomerTier] = useState<CustomerTier>(() => {
     const stored = localStorage.getItem("customerTier");
     return (stored as CustomerTier) || "standard";
@@ -56,6 +73,14 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem("orders", JSON.stringify(orders));
   }, [orders]);
+
+  useEffect(() => {
+    localStorage.setItem("wishlist", JSON.stringify(wishlist));
+  }, [wishlist]);
+
+  useEffect(() => {
+    localStorage.setItem("reviews", JSON.stringify(reviews));
+  }, [reviews]);
 
   useEffect(() => {
     localStorage.setItem("customerTier", customerTier);
@@ -132,12 +157,39 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     return cart.reduce((count, item) => count + item.quantity, 0);
   };
 
+  // Wishlist methods
+  const addToWishlist = (product: Product) => {
+    setWishlist((prev) => {
+      if (prev.some((p) => p.id === product.id)) return prev;
+      return [...prev, product];
+    });
+  };
+
+  const removeFromWishlist = (productId: string) => {
+    setWishlist((prev) => prev.filter((p) => p.id !== productId));
+  };
+
+  const isInWishlist = (productId: string) => {
+    return wishlist.some((p) => p.id === productId);
+  };
+
+  // Review methods
+  const addReview = (review: Review) => {
+    setReviews((prev) => [review, ...prev]);
+  };
+
+  const getProductReviews = (productId: string) => {
+    return reviews.filter((r) => r.productId === productId);
+  };
+
   return (
     <ShopContext.Provider
       value={{
         products,
         cart,
         orders,
+        wishlist,
+        reviews,
         customerTier,
         addToCart,
         removeFromCart,
@@ -151,6 +203,11 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         getCartCount,
         setCustomerTier,
         getPersonalizedPrice,
+        addToWishlist,
+        removeFromWishlist,
+        isInWishlist,
+        addReview,
+        getProductReviews,
       }}
     >
       {children}
