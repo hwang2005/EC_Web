@@ -38,27 +38,27 @@ export function Admin() {
     
     // Input validation
     if (!formData.name || formData.name.length < 2) {
-      toast.error("Product name is required (min 2 characters)");
+      toast.error("Cần nhập tên sản phẩm (tối thiểu 2 ký tự)");
       return;
     }
     if (!formData.description || formData.description.length < 10) {
-      toast.error("Description is required (min 10 characters)");
+      toast.error("Cần nhập mô tả (tối thiểu 10 ký tự)");
       return;
     }
     if (!formData.price || formData.price <= 0) {
-      toast.error("Valid price is required");
+      toast.error("Cần nhập giá hợp lệ");
       return;
     }
     if (!formData.stock || formData.stock < 0) {
-      toast.error("Valid stock quantity is required");
+      toast.error("Cần nhập số lượng tồn kho hợp lệ");
       return;
     }
     if (!formData.category) {
-      toast.error("Category is required");
+      toast.error("Cần nhập phân loại");
       return;
     }
     if (!formData.image) {
-      toast.error("Image URL is required");
+      toast.error("Cần nhập đường dẫn hình ảnh");
       return;
     }
 
@@ -74,12 +74,12 @@ export function Admin() {
         rating: formData.rating || 4.5,
       };
       addProduct(newProduct);
-      toast.success("Product added successfully");
+      toast.success("Đã thêm sản phẩm thành công");
     } else if (editingId) {
       const updatedProduct = products.find((p) => p.id === editingId);
       if (updatedProduct) {
         updateProduct({ ...updatedProduct, ...formData } as Product);
-        toast.success("Product updated successfully");
+        toast.success("Đã cập nhật sản phẩm thành công");
       }
     }
 
@@ -93,9 +93,9 @@ export function Admin() {
   };
 
   const handleDelete = (product: Product) => {
-    if (confirm(`Are you sure you want to delete "${product.name}"?`)) {
+    if (confirm(`Bạn có chắc chắn muốn xóa "${product.name}"?`)) {
       deleteProduct(product.id);
-      toast.success("Product deleted successfully");
+      toast.success("Đã xóa sản phẩm thành công");
     }
   };
 

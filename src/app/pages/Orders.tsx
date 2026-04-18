@@ -1,11 +1,158 @@
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
-import { Package, Truck, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Package, Truck, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
+import { Order } from "../types";
+import { toast } from "sonner";
+
+const CANCEL_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+/** Returns remaining ms in the cancellation window, or 0 if expired. */
+function getRemainingMs(order: Order): number {
+  const elapsed = Date.now() - new Date(order.orderDate).getTime();
+  return Math.max(0, CANCEL_WINDOW_MS - elapsed);
+}
+
+/** Format ms as "M:SS" */
+function formatCountdown(ms: number): string {
+  const totalSeconds = Math.ceil(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+/** Returns true if this order is eligible for cancellation (within 5 min + right status). */
+function isCancellable(order: Order): boolean {
+  if (order.status !== "pending" && order.status !== "processing") return false;
+  return getRemainingMs(order) > 0;
+}
+
+/**
+ * A self-updating countdown badge that shows the remaining time to cancel.
+ * When time runs out it hides the cancel button automatically.
+ */
+function CancelCountdown({
+  order,
+  onCancel,
+}: {
+  order: Order;
+  onCancel: (orderId: string) => void;
+}) {
+  const [remaining, setRemaining] = useState(() => getRemainingMs(order));
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    if (remaining <= 0) return;
+    const timer = setInterval(() => {
+      const r = getRemainingMs(order);
+      setRemaining(r);
+      if (r <= 0) clearInterval(timer);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [order]);
+
+  const handleCancel = useCallback(() => {
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+    onCancel(order.id);
+    setConfirming(false);
+  }, [confirming, onCancel, order.id]);
+
+  if (remaining <= 0) return null;
+
+  const urgency = remaining < 60_000; // less than 1 minute
+
+  return (
+    <div className="mt-4 pt-4 border-t border-dashed border-orange-200">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold ${
+              urgency
+                ? "bg-red-100 text-red-700 animate-pulse"
+                : "bg-orange-100 text-orange-700"
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            <span>Hủy trong {formatCountdown(remaining)}</span>
+          </div>
+          {urgency && (
+            <span className="text-xs text-red-500 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              Sắp hết hạn!
+            </span>
+          )}
+        </div>
+
+        {confirming ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Bạn chắc chắn muốn hủy?</span>
+            <button
+              onClick={handleCancel}
+              className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Xác nhận hủy
+            </button>
+            <button
+              onClick={() => setConfirming(false)}
+              className="px-4 py-2 border border-gray-300 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Không
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleCancel}
+            className="flex items-center gap-2 px-4 py-2 border-2 border-red-300 text-red-600 text-sm font-semibold rounded-lg hover:bg-red-50 hover:border-red-400 transition-colors"
+          >
+            <XCircle className="w-4 h-4" />
+            Hủy đơn hàng
+          </button>
+        )}
+      </div>
+
+      {/* Progress bar showing remaining time */}
+      <div className="mt-3">
+        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-1000 ${
+              urgency ? "bg-red-500" : "bg-orange-400"
+            }`}
+            style={{ width: `${(remaining / CANCEL_WINDOW_MS) * 100}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function Orders() {
   const { role } = useAuth();
-  const { orders } = useShop();
+  const { orders, cancelOrder } = useShop();
+
+  // Force a re-render every second so the cancellable check stays fresh
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const hasCancellable = orders.some(isCancellable);
+    if (!hasCancellable) return;
+    const timer = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, [orders]);
+
+  const handleCancelOrder = useCallback(
+    (orderId: string) => {
+      const success = cancelOrder(orderId);
+      if (success) {
+        toast.success("Đơn hàng đã được hủy thành công!");
+      } else {
+        toast.error("Không thể hủy đơn hàng. Đã quá thời hạn 5 phút hoặc đơn đã xử lý.");
+      }
+    },
+    [cancelOrder],
+  );
 
   if (role !== "consumer") {
     return (
@@ -61,20 +208,37 @@ export function Orders() {
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "Chờ xử lý";
+      case "processing":
+        return "Đang xử lý";
+      case "shipped":
+        return "Đang giao";
+      case "delivered":
+        return "Đã giao";
+      case "cancelled":
+        return "Đã hủy";
+      default:
+        return status;
+    }
+  };
+
   if (orders.length === 0) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center">
           <Package className="w-24 h-24 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-2">No orders yet</h2>
+          <h2 className="text-2xl font-bold mb-2">Chưa có đơn hàng nào</h2>
           <p className="text-gray-600 mb-8">
-            When you place orders, they will appear here.
+            Các đơn hàng bạn đặt sẽ xuất hiện ở đây.
           </p>
           <Link
             to="/products"
             className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Start Shopping
+            Bắt Đầu Mua Sắm
           </Link>
         </div>
       </div>
@@ -83,7 +247,7 @@ export function Orders() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8">Order History</h1>
+      <h1 className="text-3xl font-bold mb-8">Lịch Sử Đơn Hàng</h1>
 
       <div className="space-y-6">
         {orders.map((order) => (
@@ -94,17 +258,17 @@ export function Orders() {
                 <div>
                   <p className="font-semibold text-lg">{order.id}</p>
                   <p className="text-sm text-gray-600">
-                    Placed on {new Date(order.orderDate).toLocaleDateString()}
+                    Đặt lúc {new Date(order.orderDate).toLocaleDateString()}
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <p className="text-sm text-gray-600">Total</p>
-                    <p className="font-bold text-lg">${order.total.toFixed(2)}</p>
+                    <p className="text-sm text-gray-600">Tổng</p>
+                    <p className="font-bold text-lg">{order.total.toLocaleString("vi-VN")}₫</p>
                   </div>
                   <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${getStatusColor(order.status)}`}>
                     {getStatusIcon(order.status)}
-                    <span className="font-semibold capitalize">{order.status}</span>
+                    <span className="font-semibold">{getStatusLabel(order.status)}</span>
                   </div>
                 </div>
               </div>
@@ -113,11 +277,11 @@ export function Orders() {
             {/* Order Details */}
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {/* Shipping Address */}
+                {/* Địa chỉ giao hàng */}
                 <div>
                   <h3 className="font-semibold mb-2 flex items-center gap-2">
                     <Truck className="w-4 h-4" />
-                    Shipping Address
+                    Địa chỉ giao hàng
                   </h3>
                   <div className="text-sm text-gray-700 space-y-1">
                     <p>{order.shippingAddress.fullName}</p>
@@ -135,19 +299,19 @@ export function Orders() {
                 <div>
                   <h3 className="font-semibold mb-2 flex items-center gap-2">
                     <Package className="w-4 h-4" />
-                    Delivery Information
+                    Thông tin vận chuyển
                   </h3>
                   <div className="text-sm text-gray-700 space-y-1">
                     <p>
-                      <span className="font-semibold">Method:</span>{" "}
+                      <span className="font-semibold">Phương thức:</span>{" "}
                       {order.deliveryOption.name}
                     </p>
                     <p>
-                      <span className="font-semibold">Estimated:</span>{" "}
+                      <span className="font-semibold">Dự kiến:</span>{" "}
                       {new Date(order.estimatedDelivery).toLocaleDateString()}
                     </p>
                     <p>
-                      <span className="font-semibold">Payment:</span> {order.paymentMethod}
+                      <span className="font-semibold">Thanh toán:</span> {order.paymentMethod}
                     </p>
                   </div>
                 </div>
@@ -155,7 +319,7 @@ export function Orders() {
 
               {/* Order Items */}
               <div>
-                <h3 className="font-semibold mb-3">Items ({order.items.length})</h3>
+                <h3 className="font-semibold mb-3">Sản phẩm ({order.items.length})</h3>
                 <div className="space-y-3">
                   {order.items.map((item) => (
                     <div
@@ -175,10 +339,10 @@ export function Orders() {
                           {item.product.name}
                         </Link>
                         <p className="text-sm text-gray-600">
-                          Quantity: {item.quantity}
+                          Số lượng: {item.quantity}
                         </p>
                         <p className="text-sm font-semibold mt-1">
-                          ${(item.product.price * item.quantity).toFixed(2)}
+                          {(item.product.price * item.quantity).toLocaleString("vi-VN")}₫
                         </p>
                       </div>
                     </div>
@@ -189,13 +353,13 @@ export function Orders() {
               {/* Order Tracking */}
               {order.status !== "cancelled" && (
                 <div className="mt-6 pt-6 border-t">
-                  <h3 className="font-semibold mb-3">Order Progress</h3>
+                  <h3 className="font-semibold mb-3">Tiến trình đơn hàng</h3>
                   <div className="flex items-center justify-between">
                     {[
-                      { label: "Pending", status: "pending" },
-                      { label: "Processing", status: "processing" },
-                      { label: "Shipped", status: "shipped" },
-                      { label: "Delivered", status: "delivered" },
+                      { label: "Chờ xử lý", status: "pending" },
+                      { label: "Đang xử lý", status: "processing" },
+                      { label: "Đang giao", status: "shipped" },
+                      { label: "Đã giao", status: "delivered" },
                     ].map((step, idx, arr) => {
                       const isCompleted =
                         arr.findIndex((s) => s.status === order.status) >= idx;
@@ -225,6 +389,26 @@ export function Orders() {
                     })}
                   </div>
                 </div>
+              )}
+
+              {/* Cancelled notice */}
+              {order.status === "cancelled" && (
+                <div className="mt-6 pt-6 border-t">
+                  <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-4">
+                    <XCircle className="w-6 h-6 text-red-500 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-red-800">Đơn hàng đã bị hủy</p>
+                      <p className="text-sm text-red-600">
+                        Đơn hàng này đã được hủy bởi bạn. Số tiền sẽ được hoàn trả trong 3-5 ngày làm việc.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Cancel order section — shown only while within the 5-min window */}
+              {isCancellable(order) && (
+                <CancelCountdown order={order} onCancel={handleCancelOrder} />
               )}
             </div>
           </div>

@@ -57,25 +57,25 @@ export function Checkout() {
     
     // Sanitize and validate inputs
     if (!shippingAddress.fullName.trim() || shippingAddress.fullName.length < 2) {
-      newErrors.fullName = "Full name is required";
+      newErrors.fullName = "Cần nhập họ tên đầy đủ";
     }
     if (!shippingAddress.address.trim() || shippingAddress.address.length < 5) {
-      newErrors.address = "Valid address is required";
+      newErrors.address = "Cần nhập địa chỉ hợp lệ";
     }
     if (!shippingAddress.city.trim() || shippingAddress.city.length < 2) {
-      newErrors.city = "City is required";
+      newErrors.city = "Cần nhập thành phố";
     }
     if (!shippingAddress.state.trim()) {
-      newErrors.state = "State is required";
+      newErrors.state = "Cần nhập tỉnh/thành";
     }
     if (!/^\d{5}(-\d{4})?$/.test(shippingAddress.zipCode)) {
-      newErrors.zipCode = "Valid zip code is required";
+      newErrors.zipCode = "Cần nhập mã bưu điện hợp lệ";
     }
     if (!shippingAddress.country.trim()) {
-      newErrors.country = "Country is required";
+      newErrors.country = "Cần nhập quốc gia";
     }
     if (!/^\+?[\d\s-()]{10,}$/.test(shippingAddress.phone)) {
-      newErrors.phone = "Valid phone number is required";
+      newErrors.phone = "Cần nhập số điện thoại hợp lệ";
     }
 
     setErrors(newErrors);
@@ -88,16 +88,16 @@ export function Checkout() {
     if (selectedPayment === "card") {
       // Basic card validation (in real app, use payment gateway)
       if (!/^\d{16}$/.test(cardDetails.number.replace(/\s/g, ""))) {
-        newErrors.cardNumber = "Valid 16-digit card number required";
+        newErrors.cardNumber = "Cần nhập số thẻ 16 số hợp lệ";
       }
       if (!cardDetails.name.trim() || cardDetails.name.length < 3) {
-        newErrors.cardName = "Cardholder name required";
+        newErrors.cardName = "Cần nhập tên chủ thẻ";
       }
       if (!/^\d{2}\/\d{2}$/.test(cardDetails.expiry)) {
-        newErrors.cardExpiry = "Valid expiry date required (MM/YY)";
+        newErrors.cardExpiry = "Cần nhập ngày hết hạn hợp lệ (MM/YY)";
       }
       if (!/^\d{3,4}$/.test(cardDetails.cvv)) {
-        newErrors.cardCvv = "Valid CVV required";
+        newErrors.cardCvv = "Cần nhập mã CVV hợp lệ";
       }
     }
 
@@ -119,7 +119,7 @@ export function Checkout() {
     }
 
     // Simulate payment processing
-    toast.loading("Processing payment...");
+    toast.loading("Đang xử lý thanh toán...");
     
     setTimeout(() => {
       const orderDate = new Date();
@@ -143,22 +143,22 @@ export function Checkout() {
 
       placeOrder(order);
       toast.dismiss();
-      toast.success("Order placed successfully!");
+      toast.success("Đặt hàng thành công!");
       navigate("/orders");
     }, 2000);
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8">Checkout</h1>
+      <h1 className="text-3xl font-bold mb-8">Thanh toán</h1>
 
       {/* Progress Steps */}
       <div className="mb-8">
         <div className="flex items-center justify-between max-w-2xl mx-auto">
           {[
-            { num: 1, label: "Shipping" },
-            { num: 2, label: "Delivery" },
-            { num: 3, label: "Payment" },
+            { num: 1, label: "Giao hàng" },
+            { num: 2, label: "Vận chuyển" },
+            { num: 3, label: "Thanh toán" },
           ].map((s, idx) => (
             <div key={s.num} className="flex items-center flex-1">
               <div className="flex flex-col items-center">
@@ -188,18 +188,18 @@ export function Checkout() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Form Section */}
         <div className="lg:col-span-2">
-          {/* Step 1: Shipping Address */}
+          {/* Step 1: Shipping Địa chỉ */}
           {step === 1 && (
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center gap-2 mb-6">
                 <Truck className="w-6 h-6 text-blue-600" />
-                <h2 className="text-xl font-bold">Shipping Address</h2>
+                <h2 className="text-xl font-bold">Địa chỉ giao hàng</h2>
               </div>
 
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold mb-1">
-                    Full Name *
+                    Họ Tên *
                   </label>
                   <input
                     type="text"
@@ -219,7 +219,7 @@ export function Checkout() {
 
                 <div>
                   <label className="block text-sm font-semibold mb-1">
-                    Address *
+                    Địa chỉ *
                   </label>
                   <input
                     type="text"
@@ -239,7 +239,7 @@ export function Checkout() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold mb-1">City *</label>
+                    <label className="block text-sm font-semibold mb-1">Thành phố *</label>
                     <input
                       type="text"
                       value={shippingAddress.city}
@@ -257,7 +257,7 @@ export function Checkout() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold mb-1">State *</label>
+                    <label className="block text-sm font-semibold mb-1">Tỉnh/Thành phố *</label>
                     <input
                       type="text"
                       value={shippingAddress.state}
@@ -278,7 +278,7 @@ export function Checkout() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold mb-1">
-                      Zip Code *
+                      Mã bưu điện *
                     </label>
                     <input
                       type="text"
@@ -298,7 +298,7 @@ export function Checkout() {
 
                   <div>
                     <label className="block text-sm font-semibold mb-1">
-                      Country *
+                      Quốc gia *
                     </label>
                     <input
                       type="text"
@@ -319,7 +319,7 @@ export function Checkout() {
 
                 <div>
                   <label className="block text-sm font-semibold mb-1">
-                    Phone Number *
+                    Số điện thoại *
                   </label>
                   <input
                     type="tel"
@@ -342,7 +342,7 @@ export function Checkout() {
                 onClick={handleNext}
                 className="w-full mt-6 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
               >
-                Continue to Delivery
+                Tiếp tục Vận chuyển
               </button>
             </div>
           )}
@@ -352,7 +352,7 @@ export function Checkout() {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center gap-2 mb-6">
                 <Truck className="w-6 h-6 text-blue-600" />
-                <h2 className="text-xl font-bold">Delivery Options</h2>
+                <h2 className="text-xl font-bold">Tùy chọn Vận chuyển</h2>
               </div>
 
               <div className="space-y-3 mb-6">
@@ -380,7 +380,7 @@ export function Checkout() {
                         </div>
                       </div>
                       <p className="font-bold">
-                        {option.price === 0 ? "FREE" : `$${option.price.toFixed(2)}`}
+                        {option.price === 0 ? "MIỄN PHÍ" : `${option.price.toLocaleString("vi-VN")}₫`}
                       </p>
                     </div>
                   </label>
@@ -392,13 +392,13 @@ export function Checkout() {
                   onClick={() => setStep(1)}
                   className="flex-1 border-2 border-gray-300 py-3 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
                 >
-                  Back
+                  Quay lại
                 </button>
                 <button
                   onClick={handleNext}
                   className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
                 >
-                  Continue to Payment
+                  Tiếp tục Thanh toán
                 </button>
               </div>
             </div>
@@ -409,7 +409,7 @@ export function Checkout() {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center gap-2 mb-6">
                 <CreditCard className="w-6 h-6 text-blue-600" />
-                <h2 className="text-xl font-bold">Payment Method</h2>
+                <h2 className="text-xl font-bold">Phương thức Thanh toán</h2>
               </div>
 
               {/* Security Notice */}
@@ -418,11 +418,11 @@ export function Checkout() {
                   <Lock className="w-5 h-5 text-green-600 mt-0.5" />
                   <div className="text-sm">
                     <p className="font-semibold text-green-900 mb-1">
-                      Secure Payment Processing
+                      Xử lý Thanh toán An toàn
                     </p>
                     <p className="text-green-700">
-                      Your payment information is encrypted and never stored on our servers.
-                      We use industry-standard SSL/TLS encryption.
+                      Thông tin thanh toán của bạn được mã hóa và không bao giờ được lưu trữ trên máy chủ của chúng tôi.
+                      Chúng tôi sử dụng chuẩn mã hóa SSL/TLS.
                     </p>
                   </div>
                 </div>
@@ -458,7 +458,7 @@ export function Checkout() {
                 <div className="space-y-4 mb-6">
                   <div>
                     <label className="block text-sm font-semibold mb-1">
-                      Card Number *
+                      Số thẻ *
                     </label>
                     <input
                       type="text"
@@ -479,13 +479,13 @@ export function Checkout() {
                       <p className="text-red-500 text-sm mt-1">{errors.cardNumber}</p>
                     )}
                     <p className="text-xs text-gray-500 mt-1">
-                      Demo: Use 4242424242424242 for testing
+                      Demo: Dùng 4242424242424242 để thử nghiệm
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-semibold mb-1">
-                      Cardholder Name *
+                      Tên chủ thẻ *
                     </label>
                     <input
                       type="text"
@@ -506,7 +506,7 @@ export function Checkout() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold mb-1">
-                        Expiry Date *
+                        Ngày hết hạn *
                       </label>
                       <input
                         type="text"
@@ -557,7 +557,7 @@ export function Checkout() {
               {selectedPayment !== "card" && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                   <p className="text-sm text-blue-900">
-                    You will be redirected to complete your payment after placing the order.
+                    Bạn sẽ được chuyển hướng để hoàn tất thanh toán sau khi đặt hàng.
                   </p>
                 </div>
               )}
@@ -567,13 +567,13 @@ export function Checkout() {
                   onClick={() => setStep(2)}
                   className="flex-1 border-2 border-gray-300 py-3 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
                 >
-                  Back
+                  Quay lại
                 </button>
                 <button
                   onClick={handlePlaceOrder}
                   className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold"
                 >
-                  Place Order
+                  Đặt hàng
                 </button>
               </div>
             </div>
@@ -583,7 +583,7 @@ export function Checkout() {
         {/* Order Summary */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-lg shadow-sm p-6 sticky top-20">
-            <h2 className="text-xl font-bold mb-4">Order Summary</h2>
+            <h2 className="text-xl font-bold mb-4">Tóm Tắt Đơn Hàng</h2>
             
             <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
               {cart.map((item) => (
@@ -595,9 +595,9 @@ export function Checkout() {
                   />
                   <div className="flex-1">
                     <p className="font-semibold text-sm">{item.product.name}</p>
-                    <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                    <p className="text-sm text-gray-600">SL: {item.quantity}</p>
                     <p className="text-sm font-bold">
-                      ${(item.product.price * item.quantity).toFixed(2)}
+                      {(item.product.price * item.quantity).toLocaleString("vi-VN")}₫
                     </p>
                   </div>
                 </div>
@@ -606,35 +606,35 @@ export function Checkout() {
 
             <div className="border-t pt-4 space-y-2 mb-4">
               <div className="flex justify-between text-gray-700">
-                <span>Subtotal</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span>Tạm tính</span>
+                <span>{subtotal.toLocaleString("vi-VN")}₫</span>
               </div>
               <div className="flex justify-between text-gray-700">
-                <span>Tax (10%)</span>
-                <span>${tax.toFixed(2)}</span>
+                <span>Thuế (10%)</span>
+                <span>{tax.toLocaleString("vi-VN")}₫</span>
               </div>
               {step >= 2 && (
                 <div className="flex justify-between text-gray-700">
-                  <span>Delivery</span>
+                  <span>Vận chuyển</span>
                   <span>
-                    {deliveryFee === 0 ? "FREE" : `$${deliveryFee.toFixed(2)}`}
+                    {deliveryFee === 0 ? "MIỄN PHÍ" : `${deliveryFee.toLocaleString("vi-VN")}₫`}
                   </span>
                 </div>
               )}
               <div className="border-t pt-2 flex justify-between font-bold text-lg">
-                <span>Total</span>
-                <span className="text-blue-600">${total.toFixed(2)}</span>
+                <span>Tổng cộng</span>
+                <span className="text-blue-600">{total.toLocaleString("vi-VN")}₫</span>
               </div>
             </div>
 
             <div className="space-y-2 text-sm text-gray-600">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-green-600" />
-                <span>Secure checkout</span>
+                <span>Thanh toán an toàn</span>
               </div>
               <div className="flex items-center gap-2">
                 <Lock className="w-4 h-4 text-green-600" />
-                <span>SSL encrypted</span>
+                <span>Mã hóa SSL</span>
               </div>
             </div>
           </div>

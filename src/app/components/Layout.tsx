@@ -25,7 +25,7 @@ export function Layout() {
               <Sprout className="w-8 h-8 text-primary" />
               <div>
                 <span className="text-xl font-bold text-foreground">Nông Sản Việt</span>
-                <p className="text-xs text-muted-foreground">Vietnamese Agriculture</p>
+                <p className="text-xs text-muted-foreground">Nông Sản Việt Nam</p>
               </div>
             </Link>
 

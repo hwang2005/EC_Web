@@ -167,7 +167,7 @@ export function Auth() {
           </div>
           <h1 className="text-2xl font-bold text-foreground">Nông Sản Việt</h1>
           <p className="text-sm text-muted-foreground">
-            Vietnamese Agriculture E-Commerce
+            Thương Mại Điện Tử Nông Sản Việt
           </p>
         </Link>
       </div>

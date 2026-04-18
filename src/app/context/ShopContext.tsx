@@ -14,6 +14,7 @@ interface ShopContextType {
   updateCartQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
   placeOrder: (order: Order) => void;
+  cancelOrder: (orderId: string) => boolean;
   addProduct: (product: Product) => void;
   updateProduct: (product: Product) => void;
   deleteProduct: (productId: string) => void;
@@ -143,6 +144,26 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     clearCart();
   };
 
+  const CANCEL_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+  const cancelOrder = (orderId: string): boolean => {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return false;
+
+    const elapsed = Date.now() - new Date(order.orderDate).getTime();
+    if (elapsed > CANCEL_WINDOW_MS) return false;
+
+    // Only allow cancellation if order hasn't progressed past processing
+    if (order.status !== "pending" && order.status !== "processing") return false;
+
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.id === orderId ? { ...o, status: "cancelled" as const } : o
+      )
+    );
+    return true;
+  };
+
   const addProduct = (product: Product) => {
     setProducts((prev) => [...prev, product]);
   };
@@ -204,6 +225,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         updateCartQuantity,
         clearCart,
         placeOrder,
+        cancelOrder,
         addProduct,
         updateProduct,
         deleteProduct,

@@ -39,7 +39,7 @@ export function Cart() {
 
   const handleRemove = (productId: string, productName: string) => {
     removeFromCart(productId);
-    toast.success(`${productName} removed from cart`);
+    toast.success(`${productName} đã được xóa khỏi giỏ hàng`);
   };
 
   const subtotal = getCartTotal();
@@ -51,13 +51,13 @@ export function Cart() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center">
           <ShoppingBag className="w-24 h-24 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Your cart is empty</h2>
-          <p className="text-gray-600 mb-8">Add some products to get started!</p>
+          <h2 className="text-2xl font-bold mb-2">Giỏ hàng của bạn đang trống</h2>
+          <p className="text-gray-600 mb-8">Thêm một số sản phẩm để bắt đầu!</p>
           <Link
             to="/products"
             className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Browse Products
+            Khám Phá Sản Phẩm
             <ArrowRight className="w-5 h-5" />
           </Link>
         </div>
@@ -67,7 +67,7 @@ export function Cart() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8">Shopping Cart</h1>
+      <h1 className="text-3xl font-bold mb-8">Giỏ Hàng</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Cart Items */}
@@ -128,17 +128,17 @@ export function Cart() {
 
                   <div className="text-right">
                     <p className="font-bold text-lg">
-                      ${(item.product.price * item.quantity).toFixed(2)}
+                      {(item.product.price * item.quantity).toLocaleString("vi-VN")}₫
                     </p>
                     <p className="text-sm text-gray-600">
-                      ${item.product.price.toFixed(2)} each
+                      {item.product.price.toLocaleString("vi-VN")}₫ mỗi sản phẩm
                     </p>
                   </div>
                 </div>
 
                 {item.quantity >= item.product.stock && (
                   <p className="text-xs text-amber-600 mt-2">
-                    Maximum stock reached
+                    Đã đạt số lượng tồn kho tối đa
                   </p>
                 )}
               </div>
@@ -149,20 +149,20 @@ export function Cart() {
         {/* Order Summary */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-lg shadow-sm p-6 sticky top-20">
-            <h2 className="text-xl font-bold mb-4">Order Summary</h2>
+            <h2 className="text-xl font-bold mb-4">Tóm Tắt Đơn Hàng</h2>
             
             <div className="space-y-3 mb-6">
               <div className="flex justify-between text-gray-700">
-                <span>Subtotal ({cart.length} items)</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span>Tạm tính ({cart.length} sản phẩm)</span>
+                <span>{subtotal.toLocaleString("vi-VN")}₫</span>
               </div>
               <div className="flex justify-between text-gray-700">
-                <span>Estimated Tax (10%)</span>
-                <span>${tax.toFixed(2)}</span>
+                <span>Thuế ước tính (10%)</span>
+                <span>{tax.toLocaleString("vi-VN")}₫</span>
               </div>
               <div className="border-t pt-3 flex justify-between font-bold text-lg">
-                <span>Total</span>
-                <span className="text-blue-600">${total.toFixed(2)}</span>
+                <span>Tổng cộng</span>
+                <span className="text-blue-600">{total.toLocaleString("vi-VN")}₫</span>
               </div>
             </div>
 
@@ -170,28 +170,28 @@ export function Cart() {
               onClick={() => navigate("/checkout")}
               className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold mb-3"
             >
-              Proceed to Checkout
+              Tiến Hành Thanh Toán
             </button>
 
             <Link
               to="/products"
               className="block text-center text-blue-600 hover:text-blue-700"
             >
-              Continue Shopping
+              Tiếp Tục Mua Sắm
             </Link>
 
             <div className="mt-6 pt-6 border-t space-y-2 text-sm text-gray-600">
               <p className="flex items-center gap-2">
                 <span className="text-green-600">✓</span>
-                Secure checkout
+                Thanh toán an toàn
               </p>
               <p className="flex items-center gap-2">
                 <span className="text-green-600">✓</span>
-                Free shipping over $50
+                Miễn phí vận chuyển cho đơn hàng trên 500.000₫
               </p>
               <p className="flex items-center gap-2">
                 <span className="text-green-600">✓</span>
-                30-day returns
+                Đổi trả trong 30 ngày
               </p>
             </div>
           </div>
