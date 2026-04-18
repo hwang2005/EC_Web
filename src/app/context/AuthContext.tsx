@@ -27,6 +27,38 @@ const DEFAULT_PROFILE: UserProfile = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// ── Demo accounts injected for developer testing ──────────────────────────────
+export const DEMO_ACCOUNTS: RegisteredUser[] = [
+  {
+    name: "Khách Hàng Demo",
+    email: "consumer@demo.com",
+    phone: "0901 234 567",
+    password: "demo123",
+    role: "consumer",
+  },
+  {
+    name: "Người Bán Demo",
+    email: "seller@demo.com",
+    phone: "0912 345 678",
+    password: "demo123",
+    role: "seller",
+  },
+];
+
+// Seed demo accounts on first load (safe to call multiple times)
+function seedDemoAccounts() {
+  const users = getRegisteredUsers();
+  let changed = false;
+  for (const demo of DEMO_ACCOUNTS) {
+    if (!users.some((u) => u.email.toLowerCase() === demo.email.toLowerCase())) {
+      users.push(demo);
+      changed = true;
+    }
+  }
+  if (changed) saveRegisteredUsers(users);
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 // Helper: get registered users from localStorage
 function getRegisteredUsers(): RegisteredUser[] {
   const raw = localStorage.getItem("registered_users");
@@ -37,6 +69,9 @@ function getRegisteredUsers(): RegisteredUser[] {
 function saveRegisteredUsers(users: RegisteredUser[]) {
   localStorage.setItem("registered_users", JSON.stringify(users));
 }
+
+// Run once at module level so demo accounts are always available
+seedDemoAccounts();
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<Role>(() => {

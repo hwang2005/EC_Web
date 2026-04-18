@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
+import { DEMO_ACCOUNTS } from "../context/AuthContext";
 import {
   Sprout,
   Mail,
@@ -14,6 +15,7 @@ import {
   AlertCircle,
   ArrowRight,
   Check,
+  FlaskConical,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -136,6 +138,25 @@ export function Auth() {
     setShowConfirmPassword(false);
   };
 
+  /** One-click fill + submit for demo accounts */
+  const fillDemo = async (type: "consumer" | "seller") => {
+    const demo = DEMO_ACCOUNTS.find((a) => a.role === type)!;
+    switchMode("login");
+    setLoginEmail(demo.email);
+    setLoginPassword(demo.password);
+    setError("");
+    setIsLoading(true);
+    await new Promise((r) => setTimeout(r, 300));
+    const result = login(demo.email, demo.password);
+    setIsLoading(false);
+    if (!result.success) {
+      setError(result.error || "Dăng nhập thất bại.");
+      return;
+    }
+    toast.success(`Đăng nhập thành công với tài khoản demo ${type === "consumer" ? "Người mua" : "Người bán"}!`);
+    navigate(type === "seller" ? "/admin" : "/");
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       {/* Logo */}
@@ -153,6 +174,100 @@ export function Auth() {
 
       {/* Auth Card */}
       <div className="w-full max-w-md">
+        {/* ===== DEMO ACCOUNTS BANNER ===== */}
+        <div
+          style={{
+            background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #ecfdf5 100%)",
+            border: "1.5px solid #86efac",
+            borderRadius: "12px",
+            padding: "14px 16px",
+            marginBottom: "12px",
+            boxShadow: "0 2px 8px rgba(34,197,94,0.10)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+            <FlaskConical style={{ width: 17, height: 17, color: "#16a34a", flexShrink: 0 }} />
+            <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#15803d", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+              Tài khoản demo — Dành cho nhà phát triển
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+            {/* Consumer demo */}
+            <button
+              id="demo-consumer-btn"
+              type="button"
+              onClick={() => fillDemo("consumer")}
+              style={{
+                background: "#ffffff",
+                border: "1.5px solid #86efac",
+                borderRadius: "8px",
+                padding: "10px 12px",
+                cursor: "pointer",
+                textAlign: "left",
+                transition: "box-shadow 0.18s, border-color 0.18s",
+              }}
+              onMouseOver={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "#22c55e";
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 0 3px rgba(34,197,94,0.15)";
+              }}
+              onMouseOut={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "#86efac";
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                <UserCircle style={{ width: 15, height: 15, color: "#16a34a" }} />
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#15803d" }}>Người Mua</span>
+              </div>
+              <div style={{ fontSize: "0.7rem", color: "#374151", lineHeight: 1.5 }}>
+                <div><span style={{ color: "#6b7280" }}>Email:</span> consumer@demo.com</div>
+                <div><span style={{ color: "#6b7280" }}>Mật khẩu:</span> demo123</div>
+              </div>
+              <div style={{ marginTop: "6px", display: "flex", alignItems: "center", gap: "4px" }}>
+                <ArrowRight style={{ width: 11, height: 11, color: "#16a34a" }} />
+                <span style={{ fontSize: "0.68rem", color: "#16a34a", fontWeight: 600 }}>Click để đăng nhập</span>
+              </div>
+            </button>
+
+            {/* Seller demo */}
+            <button
+              id="demo-seller-btn"
+              type="button"
+              onClick={() => fillDemo("seller")}
+              style={{
+                background: "#ffffff",
+                border: "1.5px solid #86efac",
+                borderRadius: "8px",
+                padding: "10px 12px",
+                cursor: "pointer",
+                textAlign: "left",
+                transition: "box-shadow 0.18s, border-color 0.18s",
+              }}
+              onMouseOver={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "#22c55e";
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 0 3px rgba(34,197,94,0.15)";
+              }}
+              onMouseOut={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "#86efac";
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                <Store style={{ width: 15, height: 15, color: "#16a34a" }} />
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#15803d" }}>Người Bán</span>
+              </div>
+              <div style={{ fontSize: "0.7rem", color: "#374151", lineHeight: 1.5 }}>
+                <div><span style={{ color: "#6b7280" }}>Email:</span> seller@demo.com</div>
+                <div><span style={{ color: "#6b7280" }}>Mật khẩu:</span> demo123</div>
+              </div>
+              <div style={{ marginTop: "6px", display: "flex", alignItems: "center", gap: "4px" }}>
+                <ArrowRight style={{ width: 11, height: 11, color: "#16a34a" }} />
+                <span style={{ fontSize: "0.68rem", color: "#16a34a", fontWeight: 600 }}>Click để đăng nhập</span>
+              </div>
+            </button>
+          </div>
+        </div>
+        {/* ================================ */}
         {/* Tab Switcher */}
         <div className="flex bg-white rounded-t-xl border border-b-0 border-border overflow-hidden">
           <button

@@ -33,7 +33,15 @@ const ShopContext = createContext<ShopContextType | undefined>(undefined);
 export function ShopProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<Product[]>(() => {
     const stored = localStorage.getItem("products");
-    return stored ? JSON.parse(stored) : PRODUCTS;
+    if (stored) {
+      const storedProducts: Product[] = JSON.parse(stored);
+      // Always use latest data from source for built-in products,
+      // but keep any admin-added products (IDs not in PRODUCTS)
+      const sourceIds = new Set(PRODUCTS.map((p) => p.id));
+      const adminProducts = storedProducts.filter((p) => !sourceIds.has(p.id));
+      return [...PRODUCTS, ...adminProducts];
+    }
+    return PRODUCTS;
   });
 
   const [cart, setCart] = useState<CartItem[]>(() => {
