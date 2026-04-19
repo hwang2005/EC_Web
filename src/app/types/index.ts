@@ -8,6 +8,16 @@ export interface Product {
   stock: number;
   rating: number;
   sellerId: string;
+  // D2C Agricultural fields
+  origin?: string;           // Vùng trồng / nông trại
+  certification?: string[];  // Chứng nhận: VietGAP, GlobalGAP, Hữu cơ...
+  harvestDate?: string;      // Ngày thu hoạch
+  batchCode?: string;        // Mã lô hàng
+  shelfLife?: string;        // Thời hạn sử dụng ước tính
+  storageInstructions?: string; // Hướng dẫn bảo quản
+  unit?: string;             // Đơn vị tính: kg, bó, túi, thùng
+  isPerishable?: boolean;    // Hàng dễ hư hỏng
+  season?: string;           // Mùa vụ
 }
 
 export interface CartItem {
@@ -20,6 +30,13 @@ export interface DeliveryOption {
   name: string;
   price: number;
   estimatedDays: string;
+}
+
+export interface DeliverySlot {
+  id: string;
+  label: string;
+  timeRange: string;
+  icon: string;
 }
 
 export interface PaymentMethod {
@@ -49,6 +66,9 @@ export interface Order {
   orderDate: string;
   estimatedDelivery: string;
   buyerEmail: string;
+  deliverySlot?: string;     // Khung giờ giao hàng
+  deliveryNote?: string;     // Ghi chú giao hàng
+  substitutionPref?: string; // Tùy chọn thay thế sản phẩm
 }
 
 export interface Review {
@@ -80,4 +100,39 @@ export interface StoreProfile {
   shopAddress: string;
   shopPhone: string;
   shopEmail: string;
+}
+
+export interface FarmStory {
+  id: string;
+  name: string;
+  location: string;
+  image: string;
+  description: string;
+  certification: string[];
+  products: string[];
+  story: string;
+}
+
+export interface SeasonalProduct {
+  productId: string;
+  season: string;
+  months: number[];
+  peakMonths: number[];
+  description: string;
+}
+
+export interface Voucher {
+  id: string;
+  code: string;                         // e.g. "GOLD10"
+  description: string;                  // Human-readable description
+  discountType: "percent" | "fixed";    // Percentage off or fixed amount off
+  discountValue: number;                // e.g. 10 (%) or 50000 (₫)
+  minOrderValue: number;                // Minimum subtotal required
+  maxDiscountAmount?: number;           // Cap for percent vouchers
+  applicableRanks: string[];            // e.g. ["silver", "gold", "platinum"] or ["all"]
+  applicableCategories: string[];       // e.g. ["Trái Cây (Fruits)"] or ["all"]
+  expiryDate: string;                   // ISO date string
+  isActive: boolean;
+  usageLimit?: number;                  // Max number of times the voucher can be used
+  usedCount: number;                    // How many times it has been used
 }

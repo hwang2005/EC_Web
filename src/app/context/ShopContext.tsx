@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { Product, CartItem, Order, Review, StoreProfile } from "../types";
-import { PRODUCTS, CustomerTier } from "../data/products";
+import { Product, CartItem, Order, Review, StoreProfile, Voucher } from "../types";
+import { PRODUCTS, CustomerTier, DEFAULT_VOUCHERS } from "../data/products";
 
 interface ShopContextType {
   products: Product[];
@@ -35,6 +35,13 @@ interface ShopContextType {
   // Store profile
   storeProfile: StoreProfile;
   updateStoreProfile: (profile: StoreProfile) => void;
+  // Vouchers
+  vouchers: Voucher[];
+  validateVoucher: (code: string, subtotal: number, cartCategories: string[]) => { valid: boolean; voucher?: Voucher; error?: string };
+  applyVoucher: (voucherId: string) => void;
+  addVoucher: (voucher: Voucher) => void;
+  updateVoucher: (voucher: Voucher) => void;
+  deleteVoucher: (voucherId: string) => void;
 }
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
@@ -86,9 +93,34 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     return (stored as CustomerTier) || "standard";
   });
 
+  // ── Auto-compute tier from total delivered-order spending ──
+  const computeAutoTier = (ordersList: Order[]): CustomerTier => {
+    const totalSpent = ordersList
+      .filter((o) => o.status === "delivered")
+      .reduce((sum, o) => sum + o.total, 0);
+    if (totalSpent >= 15_000_000) return "platinum";
+    if (totalSpent >= 5_000_000) return "gold";
+    if (totalSpent >= 1_000_000) return "silver";
+    return "standard";
+  };
+
+  const autoTier = computeAutoTier(orders);
+
   const [storeProfile, setStoreProfile] = useState<StoreProfile>(() => {
     const stored = localStorage.getItem("storeProfile");
     return stored ? JSON.parse(stored) : DEFAULT_STORE_PROFILE;
+  });
+
+  const [vouchers, setVouchers] = useState<Voucher[]>(() => {
+    const stored = localStorage.getItem("vouchers");
+    if (stored) {
+      const parsed: Voucher[] = JSON.parse(stored);
+      // Merge: keep stored ones, add any DEFAULT_VOUCHERS not yet present
+      const storedIds = new Set(parsed.map((v) => v.id));
+      const newDefaults = DEFAULT_VOUCHERS.filter((v) => !storedIds.has(v.id));
+      return [...parsed, ...newDefaults];
+    }
+    return DEFAULT_VOUCHERS;
   });
 
   // Persist to localStorage
@@ -116,9 +148,20 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("customerTier", customerTier);
   }, [customerTier]);
 
+  // Sync manual tier with auto-computed tier whenever orders change
+  useEffect(() => {
+    if (autoTier !== customerTier) {
+      setCustomerTier(autoTier);
+    }
+  }, [autoTier]);
+
   useEffect(() => {
     localStorage.setItem("storeProfile", JSON.stringify(storeProfile));
   }, [storeProfile]);
+
+  useEffect(() => {
+    localStorage.setItem("vouchers", JSON.stringify(vouchers));
+  }, [vouchers]);
 
   const getPersonalizedPrice = (price: number) => {
     const discounts = {
@@ -270,6 +313,91 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     setStoreProfile(profile);
   };
 
+  // ── Voucher management ──────────────────────────────────────────────────────
+  /**
+   * Validate a voucher code against the current user tier, cart subtotal,
+   * and the list of product categories in the cart.
+   */
+  const validateVoucher = (
+    code: string,
+    subtotal: number,
+    cartCategories: string[]
+  ): { valid: boolean; voucher?: Voucher; error?: string } => {
+    const voucher = vouchers.find(
+      (v) => v.code.toUpperCase() === code.toUpperCase()
+    );
+    if (!voucher) return { valid: false, error: "Mã voucher không tồn tại." };
+    if (!voucher.isActive) return { valid: false, error: "Voucher này đã bị vô hiệu hóa." };
+
+    // Expiry check
+    if (new Date(voucher.expiryDate) < new Date()) {
+      return { valid: false, error: "Voucher đã hết hạn." };
+    }
+
+    // Usage limit check
+    if (voucher.usageLimit !== undefined && voucher.usedCount >= voucher.usageLimit) {
+      return { valid: false, error: "Voucher đã đạt giới hạn sử dụng." };
+    }
+
+    // Minimum order value check
+    if (subtotal < voucher.minOrderValue) {
+      return {
+        valid: false,
+        error: `Đơn hàng tối thiểu ${voucher.minOrderValue.toLocaleString("vi-VN")}₫ để áp dụng voucher này.`,
+      };
+    }
+
+    // Rank check
+    if (
+      !voucher.applicableRanks.includes("all") &&
+      !voucher.applicableRanks.includes(autoTier)
+    ) {
+      return {
+        valid: false,
+        error: `Voucher này chỉ dành cho hạng thành viên: ${voucher.applicableRanks.join(", ")}.`,
+      };
+    }
+
+    // Category check: at least one cart item must match the required category
+    if (!voucher.applicableCategories.includes("all")) {
+      const hasMatchingCategory = cartCategories.some((cat) =>
+        voucher.applicableCategories.includes(cat)
+      );
+      if (!hasMatchingCategory) {
+        return {
+          valid: false,
+          error: `Voucher này chỉ áp dụng cho danh mục: ${voucher.applicableCategories.join(", ")}.`,
+        };
+      }
+    }
+
+    return { valid: true, voucher };
+  };
+
+  /**
+   * Increment usedCount for a voucher after a successful order.
+   */
+  const applyVoucher = (voucherId: string) => {
+    setVouchers((prev) =>
+      prev.map((v) =>
+        v.id === voucherId ? { ...v, usedCount: v.usedCount + 1 } : v
+      )
+    );
+  };
+
+  const addVoucher = (voucher: Voucher) => {
+    setVouchers((prev) => [...prev, voucher]);
+  };
+
+  const updateVoucher = (voucher: Voucher) => {
+    setVouchers((prev) => prev.map((v) => (v.id === voucher.id ? voucher : v)));
+  };
+
+  const deleteVoucher = (voucherId: string) => {
+    setVouchers((prev) => prev.filter((v) => v.id !== voucherId));
+  };
+  // ────────────────────────────────────────────────────────────────────────────
+
   return (
     <ShopContext.Provider
       value={{
@@ -303,6 +431,12 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         getSellerReviews,
         storeProfile,
         updateStoreProfile,
+        vouchers,
+        validateVoucher,
+        applyVoucher,
+        addVoucher,
+        updateVoucher,
+        deleteVoucher,
       }}
     >
       {children}

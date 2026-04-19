@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
-import { Heart, ShoppingCart, Trash2, ArrowRight } from "lucide-react";
+import { Heart, ShoppingCart, Trash2, ArrowRight, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 
 export function Wishlist() {
@@ -47,6 +47,23 @@ export function Wishlist() {
     toast.success(`${product.name} đã được xóa khỏi danh sách yêu thích`);
   };
 
+  const handleMoveAllToCart = () => {
+    let count = 0;
+    wishlist.forEach((product) => {
+      if (product.stock > 0) {
+        addToCart(product);
+        count++;
+      }
+    });
+    // Clear all from wishlist
+    wishlist.forEach((product) => removeFromWishlist(product.id));
+    if (count > 0) {
+      toast.success(`Đã thêm ${count} sản phẩm vào giỏ hàng!`);
+    } else {
+      toast.error("Tất cả sản phẩm đều hết hàng.");
+    }
+  };
+
   if (wishlist.length === 0) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -70,12 +87,21 @@ export function Wishlist() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex items-center gap-3 mb-8">
-        <Heart className="w-8 h-8 text-primary" />
-        <div>
-          <h1 className="text-foreground">Sản Phẩm Yêu Thích</h1>
-          <p className="text-muted-foreground">{wishlist.length} sản phẩm</p>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-3">
+          <Heart className="w-8 h-8 text-primary" />
+          <div>
+            <h1 className="text-foreground">Sản Phẩm Yêu Thích</h1>
+            <p className="text-muted-foreground">{wishlist.length} sản phẩm</p>
+          </div>
         </div>
+        <button
+          onClick={handleMoveAllToCart}
+          className="inline-flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg hover:bg-primary/90 transition-colors font-semibold shadow-sm"
+        >
+          <ShoppingBag className="w-5 h-5" />
+          Thêm Tất Cả Vào Giỏ
+        </button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
-import { Package, Truck, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
+import { Package, Truck, CheckCircle, XCircle, Clock, AlertTriangle, ShoppingCart, RotateCcw } from "lucide-react";
 import { Order } from "../types";
 import { toast } from "sonner";
 
@@ -131,7 +131,8 @@ function CancelCountdown({
 
 export function Orders() {
   const { role } = useAuth();
-  const { orders, cancelOrder } = useShop();
+  const { orders, cancelOrder, addToCart, products } = useShop();
+  const navigate = useNavigate();
 
   // Force a re-render every second so the cancellable check stays fresh
   const [, setTick] = useState(0);
@@ -152,6 +153,37 @@ export function Orders() {
       }
     },
     [cancelOrder],
+  );
+
+  /** Buy Again: re-add all available items from a past order to the cart */
+  const handleBuyAgain = useCallback(
+    (order: Order) => {
+      let addedCount = 0;
+      let outOfStockItems: string[] = [];
+
+      order.items.forEach((item) => {
+        // Find the current version of the product (in case stock changed)
+        const currentProduct = products.find((p) => p.id === item.product.id);
+        if (currentProduct && currentProduct.stock > 0) {
+          const qty = Math.min(item.quantity, currentProduct.stock);
+          addToCart(currentProduct, qty);
+          addedCount += qty;
+        } else {
+          outOfStockItems.push(item.product.name);
+        }
+      });
+
+      if (addedCount > 0) {
+        toast.success(`Đã thêm ${addedCount} sản phẩm vào giỏ hàng!`);
+      }
+      if (outOfStockItems.length > 0) {
+        toast.error(`Hết hàng: ${outOfStockItems.join(", ")}`);
+      }
+      if (addedCount > 0) {
+        navigate("/cart");
+      }
+    },
+    [products, addToCart, navigate],
   );
 
   if (role !== "consumer") {
@@ -258,7 +290,7 @@ export function Orders() {
                 <div>
                   <p className="font-semibold text-lg">{order.id}</p>
                   <p className="text-sm text-gray-600">
-                    Đặt lúc {new Date(order.orderDate).toLocaleDateString()}
+                    Đặt lúc {new Date(order.orderDate).toLocaleDateString("vi-VN")}
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
@@ -308,11 +340,34 @@ export function Orders() {
                     </p>
                     <p>
                       <span className="font-semibold">Dự kiến:</span>{" "}
-                      {new Date(order.estimatedDelivery).toLocaleDateString()}
+                      {new Date(order.estimatedDelivery).toLocaleDateString("vi-VN")}
                     </p>
                     <p>
                       <span className="font-semibold">Thanh toán:</span> {order.paymentMethod}
                     </p>
+                    {order.deliverySlot && (
+                      <p>
+                        <span className="font-semibold">Khung giờ:</span>{" "}
+                        <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs font-medium">
+                          <Clock className="w-3 h-3" />
+                          {order.deliverySlot}
+                        </span>
+                      </p>
+                    )}
+                    {order.deliveryNote && (
+                      <p>
+                        <span className="font-semibold">Ghi chú:</span>{" "}
+                        <span className="italic text-gray-600">{order.deliveryNote}</span>
+                      </p>
+                    )}
+                    {order.substitutionPref && (
+                      <p>
+                        <span className="font-semibold">Thay thế SP:</span>{" "}
+                        <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-xs font-medium">
+                          {order.substitutionPref}
+                        </span>
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -409,6 +464,25 @@ export function Orders() {
               {/* Cancel order section — shown only while within the 5-min window */}
               {isCancellable(order) && (
                 <CancelCountdown order={order} onCancel={handleCancelOrder} />
+              )}
+
+              {/* ═══ Buy Again Button ═══ */}
+              {(order.status === "delivered" || order.status === "cancelled") && (
+                <div className="mt-6 pt-6 border-t border-dashed border-green-200">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <RotateCcw className="w-4 h-4 text-green-600" />
+                      <span>Muốn đặt lại đơn hàng này?</span>
+                    </div>
+                    <button
+                      onClick={() => handleBuyAgain(order)}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+                    >
+                      <ShoppingCart className="w-4 h-4" />
+                      Mua Lại
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>

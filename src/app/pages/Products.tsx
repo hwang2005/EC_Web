@@ -2,17 +2,35 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
-import { Search, Filter, Tag, Heart } from "lucide-react";
-import { CustomerTierSelector } from "../components/CustomerTierSelector";
-import { CUSTOMER_TIERS } from "../data/products";
+import { Search, Filter, Tag, Heart, Leaf, Snowflake, PackageCheck, Crown, Info, Receipt } from "lucide-react";
+import { CUSTOMER_TIERS, SEASONAL_CALENDAR } from "../data/products";
+import type { CustomerTier } from "../data/products";
 import { toast } from "sonner";
 
 export function Products() {
   const { role } = useAuth();
-  const { products, customerTier, getPersonalizedPrice, isInWishlist, addToWishlist, removeFromWishlist } = useShop();
+  const { products, customerTier, getPersonalizedPrice, isInWishlist, addToWishlist, removeFromWishlist, orders } = useShop();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Tất Cả");
   const [sortBy, setSortBy] = useState("name");
+
+  // Agricultural filters
+  const [filterInSeason, setFilterInSeason] = useState(false);
+  const [filterPerishable, setFilterPerishable] = useState(false);
+  const [filterCert, setFilterCert] = useState<string>("");
+  const [filterInStock, setFilterInStock] = useState(false);
+
+  const currentMonth = new Date().getMonth() + 1;
+  const inSeasonProductIds = new Set(
+    SEASONAL_CALENDAR
+      .filter((sp) => sp.peakMonths.includes(currentMonth))
+      .map((sp) => sp.productId)
+  );
+
+  // Gather all unique certifications
+  const allCertifications = Array.from(
+    new Set(products.flatMap((p) => p.certification || []))
+  ).sort();
 
   const categories = ["Tất Cả", ...Array.from(new Set(products.map((p) => p.category)))];
 
@@ -21,7 +39,11 @@ export function Products() {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            product.description.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = selectedCategory === "Tất Cả" || product.category === selectedCategory;
-      return matchesSearch && matchesCategory;
+      const matchesSeason = !filterInSeason || inSeasonProductIds.has(product.id);
+      const matchesPerishable = !filterPerishable || product.isPerishable;
+      const matchesCert = !filterCert || (product.certification && product.certification.some(c => c.includes(filterCert)));
+      const matchesStock = !filterInStock || product.stock > 0;
+      return matchesSearch && matchesCategory && matchesSeason && matchesPerishable && matchesCert && matchesStock;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -36,6 +58,8 @@ export function Products() {
       }
     });
 
+  const hasActiveAgriFilter = filterInSeason || filterPerishable || !!filterCert || filterInStock;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="mb-2">Sản Phẩm Nông Sản</h1>
@@ -43,14 +67,134 @@ export function Products() {
         Khám phá các sản phẩm nông sản Việt Nam chất lượng cao
       </p>
 
-      {role === "consumer" && (
-        <div className="mb-8">
-          <CustomerTierSelector />
+      {role === "consumer" && (() => {
+        const totalSpent = orders
+          .filter((o) => o.status === "delivered")
+          .reduce((sum, o) => sum + o.total, 0);
+        const tierInfo = CUSTOMER_TIERS[customerTier];
+        const tierOrder: CustomerTier[] = ["standard", "silver", "gold", "platinum"];
+        const currentIdx = tierOrder.indexOf(customerTier);
+        const nextTier = currentIdx < tierOrder.length - 1 ? tierOrder[currentIdx + 1] : null;
+        const nextThreshold = nextTier === "silver" ? 1_000_000 : nextTier === "gold" ? 5_000_000 : 15_000_000;
+
+        const tierColorMap: Record<CustomerTier, { border: string; bg: string; text: string; icon: string }> = {
+          standard: { border: "border-gray-300", bg: "bg-gray-50", text: "text-gray-700", icon: "🌱" },
+          silver: { border: "border-slate-400", bg: "bg-slate-50", text: "text-slate-700", icon: "🥈" },
+          gold: { border: "border-yellow-400", bg: "bg-yellow-50", text: "text-yellow-800", icon: "🥇" },
+          platinum: { border: "border-purple-400", bg: "bg-purple-50", text: "text-purple-800", icon: "💎" },
+        };
+        const colors = tierColorMap[customerTier];
+
+        return (
+          <div className="mb-8 space-y-4">
+            {/* Auto Tier Banner */}
+            <div className={`rounded-xl border-2 ${colors.border} ${colors.bg} p-5 shadow-sm`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">{colors.icon}</span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Crown className={`w-5 h-5 ${colors.text}`} />
+                      <h3 className={`font-bold text-lg ${colors.text}`}>{tierInfo.name}</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Hạng tự động dựa trên tổng chi tiêu: <strong>{totalSpent.toLocaleString("vi-VN")}₫</strong>
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  {tierInfo.discount > 0 ? (
+                    <div>
+                      <p className={`text-2xl font-bold ${colors.text}`}>-{tierInfo.discount}%</p>
+                      <p className="text-xs text-muted-foreground">Giảm giá tự động áp dụng</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-lg font-semibold text-muted-foreground">Giá gốc</p>
+                      <p className="text-xs text-muted-foreground">Chưa có giảm giá hạng thành viên</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {nextTier && (
+                <div className="mt-4 pt-3 border-t border-border/50">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                    <span>Tiến trình lên <strong>{CUSTOMER_TIERS[nextTier].name}</strong></span>
+                    <span>{totalSpent.toLocaleString("vi-VN")}₫ / {nextThreshold.toLocaleString("vi-VN")}₫</span>
+                  </div>
+                  <div className="w-full bg-white/60 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all bg-gradient-to-r ${
+                        customerTier === "standard" ? "from-gray-400 to-slate-400" :
+                        customerTier === "silver" ? "from-slate-400 to-yellow-400" :
+                        "from-yellow-400 to-purple-500"
+                      }`}
+                      style={{ width: `${Math.min(100, (totalSpent / nextThreshold) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Tax Info Banner for Registered Users */}
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-start gap-3">
+                <Receipt className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold text-blue-900 text-sm mb-1">Thông tin thuế & giá hiển thị</p>
+                  <ul className="text-sm text-blue-800 space-y-1">
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-blue-500 mt-0.5">•</span>
+                      <span>Giá hiển thị trên trang sản phẩm là <strong>giá trước thuế</strong> (chưa bao gồm VAT).</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-blue-500 mt-0.5">•</span>
+                      <span>Thuế GTGT (VAT) <strong>10%</strong> sẽ được tính thêm khi thanh toán theo quy định của pháp luật Việt Nam.</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-blue-500 mt-0.5">•</span>
+                      <span>Giảm giá thành viên <strong>{tierInfo.discount}%</strong> đã được áp dụng tự động vào giá hiển thị (nếu có).</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-blue-500 mt-0.5">•</span>
+                      <span>Tổng thanh toán = Giá sản phẩm (sau giảm giá) + VAT 10% + Phí vận chuyển.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Tax Info Banner for Guest / Non-consumer users */}
+      {role !== "consumer" && (
+        <div className="mb-8 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <Info className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-semibold text-amber-900 text-sm mb-1">Quy định về giá & thuế</p>
+              <ul className="text-sm text-amber-800 space-y-1">
+                <li className="flex items-start gap-1.5">
+                  <span className="text-amber-500 mt-0.5">•</span>
+                  <span>Giá hiển thị là <strong>giá trước thuế</strong> (chưa bao gồm VAT 10%).</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-amber-500 mt-0.5">•</span>
+                  <span>Thuế GTGT (VAT) 10% sẽ được cộng thêm khi thanh toán theo quy định pháp luật Việt Nam.</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-amber-500 mt-0.5">•</span>
+                  <span><strong>Đăng nhập</strong> để hưởng giảm giá thành viên lên đến 15% tùy theo hạng khách hàng.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm p-4 mb-8 border border-border">
+      <div className="bg-white rounded-lg shadow-sm p-4 mb-4 border border-border">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Search */}
           <div className="relative">
@@ -90,6 +234,72 @@ export function Products() {
             <option value="price-low">Giá: Thấp đến Cao</option>
             <option value="price-high">Giá: Cao đến Thấp</option>
             <option value="rating">Đánh Giá Cao Nhất</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Agricultural Filter Chips */}
+      <div className="bg-white rounded-lg shadow-sm p-4 mb-6 border border-border">
+        <div className="flex items-center gap-2 mb-3">
+          <Tag className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-semibold text-foreground">Lọc nông sản:</span>
+          {hasActiveAgriFilter && (
+            <button
+              onClick={() => { setFilterInSeason(false); setFilterPerishable(false); setFilterCert(""); setFilterInStock(false); }}
+              className="text-xs text-destructive hover:underline ml-auto"
+            >
+              Xóa bộ lọc
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setFilterInSeason(!filterInSeason)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+              filterInSeason
+                ? "bg-green-600 text-white border-green-600"
+                : "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+            }`}
+          >
+            <Leaf className="w-3.5 h-3.5" />
+            Đang vào mùa
+          </button>
+          <button
+            onClick={() => setFilterPerishable(!filterPerishable)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+              filterPerishable
+                ? "bg-orange-600 text-white border-orange-600"
+                : "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
+            }`}
+          >
+            <Snowflake className="w-3.5 h-3.5" />
+            Hàng tươi sống
+          </button>
+          <button
+            onClick={() => setFilterInStock(!filterInStock)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+              filterInStock
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+            }`}
+          >
+            <PackageCheck className="w-3.5 h-3.5" />
+            Còn hàng
+          </button>
+          <div className="h-6 w-px bg-border mx-1" />
+          <select
+            value={filterCert}
+            onChange={(e) => setFilterCert(e.target.value)}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium border appearance-none cursor-pointer transition-colors ${
+              filterCert
+                ? "bg-amber-600 text-white border-amber-600"
+                : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+            }`}
+          >
+            <option value="">🏅 Chứng nhận</option>
+            {allCertifications.map((cert) => (
+              <option key={cert} value={cert}>{cert}</option>
+            ))}
           </select>
         </div>
       </div>
@@ -181,6 +391,9 @@ export function Products() {
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   {product.stock > 0 ? `Còn ${product.stock} sản phẩm` : "Hết hàng"}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-1 italic">
+                  Giá chưa bao gồm VAT 10%
                 </p>
               </div>
             </Link>

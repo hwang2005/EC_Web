@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
-import { ArrowLeft, ShoppingCart, Star, Truck, ShieldCheck, Heart, Send } from "lucide-react";
+import { ArrowLeft, ShoppingCart, Star, Truck, ShieldCheck, Heart, Send, MapPin, CalendarDays, Hash, Award, Thermometer, Leaf, AlertTriangle, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Review } from "../types";
 
@@ -110,6 +110,17 @@ export function ProductDetail() {
     toast.success("Cảm ơn bạn đã đánh giá sản phẩm!");
   };
 
+  // Helper to get certification badge color
+  const getCertBadgeStyle = (cert: string) => {
+    if (cert.includes("Hữu Cơ") || cert.includes("Organic")) return "bg-green-100 text-green-800 border-green-200";
+    if (cert.includes("VietGAP")) return "bg-emerald-100 text-emerald-800 border-emerald-200";
+    if (cert.includes("GlobalGAP")) return "bg-blue-100 text-blue-800 border-blue-200";
+    if (cert.includes("OCOP")) return "bg-amber-100 text-amber-800 border-amber-200";
+    if (cert.includes("UTZ") || cert.includes("4C")) return "bg-teal-100 text-teal-800 border-teal-200";
+    if (cert.includes("ISO")) return "bg-indigo-100 text-indigo-800 border-indigo-200";
+    return "bg-gray-100 text-gray-800 border-gray-200";
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <Link
@@ -123,21 +134,42 @@ export function ProductDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         {/* Product Image */}
         <div className="bg-white rounded-lg overflow-hidden shadow-sm border border-border">
-          <div className="aspect-square">
+          <div className="aspect-square relative">
             <img
               src={product.image}
               alt={product.name}
               className="w-full h-full object-cover"
             />
+            {/* Perishable Badge */}
+            {product.isPerishable && (
+              <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 text-white text-sm font-semibold rounded-full shadow-md">
+                <Thermometer className="w-4 h-4" />
+                Hàng tươi sống
+              </div>
+            )}
+            {/* Season Badge */}
+            {product.season && (
+              <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm font-semibold rounded-full shadow-md">
+                <Leaf className="w-4 h-4" />
+                {product.season.length > 20 ? "Đang vào mùa" : product.season}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Product Info */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <span className="inline-block bg-accent text-foreground text-sm px-3 py-1 rounded-full">
-              {product.category}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="inline-block bg-accent text-foreground text-sm px-3 py-1 rounded-full">
+                {product.category}
+              </span>
+              {product.unit && (
+                <span className="inline-block bg-blue-50 text-blue-700 text-sm px-3 py-1 rounded-full border border-blue-200">
+                  Đơn vị: {product.unit}
+                </span>
+              )}
+            </div>
             <button
               onClick={handleToggleWishlist}
               className={`p-2 rounded-full transition-colors ${
@@ -182,7 +214,25 @@ export function ProductDetail() {
             <span className="text-4xl font-bold text-primary">
               {personalizedPrice.toLocaleString("vi-VN")}₫
             </span>
+            {product.unit && (
+              <span className="text-lg text-muted-foreground ml-2">/ {product.unit}</span>
+            )}
           </div>
+
+          {/* Certification Badges */}
+          {product.certification && product.certification.length > 0 && (
+            <div className="mb-6 flex flex-wrap gap-2">
+              {product.certification.map((cert) => (
+                <span
+                  key={cert}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full border ${getCertBadgeStyle(cert)}`}
+                >
+                  <Award className="w-3.5 h-3.5" />
+                  {cert}
+                </span>
+              ))}
+            </div>
+          )}
 
           {!isCustomer && (
             <div className="mb-6 rounded-lg border border-border bg-accent/40 px-4 py-3 text-sm text-foreground">
@@ -240,6 +290,21 @@ export function ProductDetail() {
             </button>
           </div>
 
+          {/* Perishable Warning */}
+          {product.isPerishable && (
+            <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold text-orange-900 text-sm">Sản phẩm tươi sống — Cần bảo quản đặc biệt</p>
+                  <p className="text-sm text-orange-700 mt-1">
+                    Sản phẩm này là hàng tươi sống, cần được giao nhanh và bảo quản đúng cách. Chúng tôi khuyến nghị chọn phương thức giao hàng nhanh hoặc giao trong ngày.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Features */}
           <div className="border-t border-border pt-6 space-y-4">
             <div className="flex items-center gap-3 text-muted-foreground">
@@ -257,6 +322,171 @@ export function ProductDetail() {
           </div>
         </div>
       </div>
+
+      {/* ═══════ Traceability Section ═══════ */}
+      {(product.origin || product.batchCode || product.harvestDate) && (
+        <div className="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Truy Xuất Nguồn Gốc */}
+          <div className="bg-white rounded-lg shadow-sm border border-border overflow-hidden">
+            <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <MapPin className="w-5 h-5" />
+                Truy Xuất Nguồn Gốc
+              </h2>
+              <p className="text-green-100 text-sm mt-1">Thông tin lô hàng và xuất xứ sản phẩm</p>
+            </div>
+            <div className="p-6">
+              <div className="space-y-4">
+                {product.origin && (
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <MapPin className="w-5 h-5 text-green-700" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground font-medium">Vùng trồng / Nông trại</p>
+                      <p className="text-foreground font-semibold">{product.origin}</p>
+                    </div>
+                  </div>
+                )}
+                {product.harvestDate && (
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <CalendarDays className="w-5 h-5 text-blue-700" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground font-medium">Ngày thu hoạch / Đóng gói</p>
+                      <p className="text-foreground font-semibold">
+                        {new Date(product.harvestDate).toLocaleDateString("vi-VN", {
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {product.batchCode && (
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Hash className="w-5 h-5 text-purple-700" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground font-medium">Mã lô hàng</p>
+                      <p className="text-foreground font-semibold font-mono">{product.batchCode}</p>
+                    </div>
+                  </div>
+                )}
+                {product.certification && product.certification.length > 0 && (
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Award className="w-5 h-5 text-amber-700" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground font-medium">Chứng nhận chất lượng</p>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {product.certification.map((cert) => (
+                          <span key={cert} className={`text-xs px-2 py-1 rounded border font-medium ${getCertBadgeStyle(cert)}`}>
+                            {cert}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Farm Journey */}
+              <div className="mt-6 pt-6 border-t border-border">
+                <p className="text-sm font-semibold text-foreground mb-3">Hành trình từ nông trại đến tay bạn</p>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  {[
+                    { label: "Thu hoạch", icon: "🌾" },
+                    { label: "Kiểm định", icon: "🔬" },
+                    { label: "Đóng gói", icon: "📦" },
+                    { label: "Vận chuyển", icon: "🚚" },
+                    { label: "Giao hàng", icon: "🏠" },
+                  ].map((step, idx, arr) => (
+                    <div key={step.label} className="flex items-center flex-1">
+                      <div className="flex flex-col items-center">
+                        <span className="text-lg mb-1">{step.icon}</span>
+                        <span className="text-center leading-tight">{step.label}</span>
+                      </div>
+                      {idx < arr.length - 1 && (
+                        <div className="flex-1 h-0.5 bg-green-300 mx-1 mt-[-14px]" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bảo Quản & Chất Lượng */}
+          <div className="space-y-6">
+            {/* Storage Instructions */}
+            {(product.storageInstructions || product.shelfLife) && (
+              <div className="bg-white rounded-lg shadow-sm border border-border overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-600 to-cyan-600 px-6 py-4">
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Thermometer className="w-5 h-5" />
+                    Hướng Dẫn Bảo Quản
+                  </h2>
+                </div>
+                <div className="p-6 space-y-4">
+                  {product.shelfLife && (
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-cyan-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Clock className="w-5 h-5 text-cyan-700" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground font-medium">Thời hạn sử dụng</p>
+                        <p className="text-foreground font-semibold">{product.shelfLife}</p>
+                      </div>
+                    </div>
+                  )}
+                  {product.storageInstructions && (
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Thermometer className="w-5 h-5 text-blue-700" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground font-medium">Cách bảo quản</p>
+                        <p className="text-foreground text-sm leading-relaxed">{product.storageInstructions}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Quality Guarantee */}
+            <div className="bg-white rounded-lg shadow-sm border border-border overflow-hidden">
+              <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5" />
+                  Cam Kết Chất Lượng
+                </h2>
+              </div>
+              <div className="p-6">
+                <ul className="space-y-3">
+                  {[
+                    { text: "Cam kết 100% tươi mới, đúng nguồn gốc như mô tả", icon: "✅" },
+                    { text: "Đổi/trả miễn phí nếu hàng dập, hỏng, sai sản phẩm", icon: "🔄" },
+                    { text: "Hoàn tiền 100% nếu không đạt chất lượng", icon: "💰" },
+                    { text: "Tiếp nhận khiếu nại trong vòng 24 giờ sau giao hàng", icon: "📞" },
+                    { text: "Gửi ảnh minh chứng để xử lý nhanh nhất", icon: "📸" },
+                  ].map((item) => (
+                    <li key={item.text} className="flex items-start gap-3 text-sm">
+                      <span className="text-base flex-shrink-0">{item.icon}</span>
+                      <span className="text-foreground">{item.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Reviews Section */}
       <div className="mt-16">

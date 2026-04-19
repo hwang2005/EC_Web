@@ -2,14 +2,14 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
-import { DELIVERY_OPTIONS, PAYMENT_METHODS } from "../data/products";
-import { ShippingAddress, DeliveryOption, Order } from "../types";
-import { CreditCard, Truck, ShieldCheck, Lock } from "lucide-react";
+import { DELIVERY_OPTIONS, PAYMENT_METHODS, DELIVERY_SLOTS } from "../data/products";
+import { ShippingAddress, DeliveryOption, Order, Voucher } from "../types";
+import { CreditCard, Truck, ShieldCheck, Lock, AlertTriangle, Clock, MessageSquare, RefreshCw, Tag, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export function Checkout() {
   const { role } = useAuth();
-  const { cart, getCartTotal, placeOrder } = useShop();
+  const { cart, getCartTotal, placeOrder, validateVoucher, applyVoucher } = useShop();
   const navigate = useNavigate();
   
   const [step, setStep] = useState(1); // 1: Shipping, 2: Delivery, 3: Payment
@@ -26,6 +26,9 @@ export function Checkout() {
 
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryOption>(DELIVERY_OPTIONS[0]);
   const [selectedPayment, setSelectedPayment] = useState(PAYMENT_METHODS[0].id);
+  const [selectedSlot, setSelectedSlot] = useState(DELIVERY_SLOTS[1].id); // Default: morning
+  const [deliveryNote, setDeliveryNote] = useState("");
+  const [substitutionPref, setSubstitutionPref] = useState("no-sub");
   
   const [cardDetails, setCardDetails] = useState({
     number: "",
@@ -36,10 +39,30 @@ export function Checkout() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // ── Voucher state ──
+  const [voucherCode, setVoucherCode] = useState("");
+  const [appliedVoucher, setAppliedVoucher] = useState<Voucher | null>(null);
+  const [voucherError, setVoucherError] = useState("");
+  const [voucherSuccess, setVoucherSuccess] = useState("");
+
   const subtotal = getCartTotal();
+
+  // Compute voucher discount
+  const cartCategories = [...new Set(cart.map((item) => item.product.category))];
+  const computeVoucherDiscount = (voucher: Voucher | null): number => {
+    if (!voucher) return 0;
+    if (voucher.discountType === "fixed") return voucher.discountValue;
+    const pctOff = subtotal * (voucher.discountValue / 100);
+    return voucher.maxDiscountAmount ? Math.min(pctOff, voucher.maxDiscountAmount) : pctOff;
+  };
+  const voucherDiscount = computeVoucherDiscount(appliedVoucher);
+
   const tax = subtotal * 0.1;
   const deliveryFee = selectedDelivery.price;
-  const total = subtotal + tax + deliveryFee;
+  const total = subtotal - voucherDiscount + tax + deliveryFee;
+
+  // Check if cart has perishable items
+  const hasPerishableItems = cart.some((item) => item.product.isPerishable);
 
   if (role !== "consumer") {
     navigate("/auth");
@@ -129,6 +152,8 @@ export function Checkout() {
         parseInt(selectedDelivery.estimatedDays.split("-")[0])
       );
 
+      const slotInfo = DELIVERY_SLOTS.find(s => s.id === selectedSlot);
+
       const order: Order = {
         id: `ORD-${Date.now()}`,
         items: cart,
@@ -140,9 +165,16 @@ export function Checkout() {
         orderDate: orderDate.toISOString(),
         estimatedDelivery: estimatedDelivery.toISOString(),
         buyerEmail: localStorage.getItem("current_user_email") || "",
+        deliverySlot: slotInfo ? `${slotInfo.label} (${slotInfo.timeRange})` : undefined,
+        deliveryNote: deliveryNote.trim() || undefined,
+        substitutionPref: substitutionPref === "no-sub" ? "Không cho thay thế" : "Gọi xác nhận trước khi thay",
       };
 
       placeOrder(order);
+      // Increment voucher usage
+      if (appliedVoucher) {
+        applyVoucher(appliedVoucher.id);
+      }
       toast.dismiss();
       toast.success("Đặt hàng thành công!");
       navigate("/orders");
@@ -211,7 +243,7 @@ export function Checkout() {
                     className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       errors.fullName ? "border-red-500" : "border-gray-300"
                     }`}
-                    placeholder="John Doe"
+                    placeholder="Nguyễn Văn A"
                   />
                   {errors.fullName && (
                     <p className="text-red-500 text-sm mt-1">{errors.fullName}</p>
@@ -231,7 +263,7 @@ export function Checkout() {
                     className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       errors.address ? "border-red-500" : "border-gray-300"
                     }`}
-                    placeholder="123 Main Street, Apt 4B"
+                    placeholder="123 Nguyễn Huệ, Phường Bến Nghé"
                   />
                   {errors.address && (
                     <p className="text-red-500 text-sm mt-1">{errors.address}</p>
@@ -250,7 +282,7 @@ export function Checkout() {
                       className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                         errors.city ? "border-red-500" : "border-gray-300"
                       }`}
-                      placeholder="New York"
+                      placeholder="TP. Hồ Chí Minh"
                     />
                     {errors.city && (
                       <p className="text-red-500 text-sm mt-1">{errors.city}</p>
@@ -268,7 +300,7 @@ export function Checkout() {
                       className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                         errors.state ? "border-red-500" : "border-gray-300"
                       }`}
-                      placeholder="NY"
+                      placeholder="Hồ Chí Minh"
                     />
                     {errors.state && (
                       <p className="text-red-500 text-sm mt-1">{errors.state}</p>
@@ -290,7 +322,7 @@ export function Checkout() {
                       className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                         errors.zipCode ? "border-red-500" : "border-gray-300"
                       }`}
-                      placeholder="10001"
+                      placeholder="70000"
                     />
                     {errors.zipCode && (
                       <p className="text-red-500 text-sm mt-1">{errors.zipCode}</p>
@@ -310,7 +342,7 @@ export function Checkout() {
                       className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                         errors.country ? "border-red-500" : "border-gray-300"
                       }`}
-                      placeholder="United States"
+                      placeholder="Việt Nam"
                     />
                     {errors.country && (
                       <p className="text-red-500 text-sm mt-1">{errors.country}</p>
@@ -331,7 +363,7 @@ export function Checkout() {
                     className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       errors.phone ? "border-red-500" : "border-gray-300"
                     }`}
-                    placeholder="+1 (555) 123-4567"
+                    placeholder="0912 345 678"
                   />
                   {errors.phone && (
                     <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
@@ -356,6 +388,29 @@ export function Checkout() {
                 <h2 className="text-xl font-bold">Tùy chọn Vận chuyển</h2>
               </div>
 
+              {/* Perishable Warning */}
+              {hasPerishableItems && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-orange-900 text-sm">⚠️ Giỏ hàng có sản phẩm tươi sống</p>
+                      <p className="text-sm text-orange-700 mt-1">
+                        Đơn hàng của bạn có sản phẩm dễ hỏng. Chúng tôi khuyến nghị chọn <strong>Giao Hàng Nhanh</strong> hoặc <strong>Giao Trong Ngày</strong> và khung giờ <strong>Sáng sớm</strong> để đảm bảo độ tươi.
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {cart.filter(item => item.product.isPerishable).map(item => (
+                          <span key={item.product.id} className="inline-flex items-center gap-1 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
+                            🧊 {item.product.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Delivery Method Selection */}
               <div className="space-y-3 mb-6">
                 {DELIVERY_OPTIONS.map((option) => (
                   <label
@@ -386,6 +441,101 @@ export function Checkout() {
                     </div>
                   </label>
                 ))}
+              </div>
+
+              {/* ═══ Delivery Slot Selection ═══ */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-bold text-lg">Chọn khung giờ nhận hàng</h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-4">
+                  Chọn khung giờ mong muốn nhận hàng. Với sản phẩm tươi sống, chúng tôi khuyến nghị nhận hàng vào buổi sáng sớm.
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {DELIVERY_SLOTS.map((slot) => (
+                    <label
+                      key={slot.id}
+                      className={`block p-4 border-2 rounded-lg cursor-pointer transition-all text-center ${
+                        selectedSlot === slot.id
+                          ? "border-blue-600 bg-blue-50 shadow-sm"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="deliverySlot"
+                        value={slot.id}
+                        checked={selectedSlot === slot.id}
+                        onChange={() => setSelectedSlot(slot.id)}
+                        className="sr-only"
+                      />
+                      <span className="text-2xl block mb-2">{slot.icon}</span>
+                      <p className="font-semibold text-sm">{slot.label}</p>
+                      <p className="text-xs text-gray-500 mt-1">{slot.timeRange}</p>
+                      {slot.id === "early-morning" && hasPerishableItems && (
+                        <span className="inline-block mt-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Khuyến nghị</span>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* ═══ Substitution Preferences ═══ */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <RefreshCw className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-bold text-lg">Tùy chọn thay thế sản phẩm</h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-4">
+                  Nông sản có thể hết hàng hoặc không đạt chất lượng ở phút cuối. Vui lòng chọn cách xử lý.
+                </p>
+                <div className="space-y-3">
+                  {[
+                    { id: "no-sub", label: "Không cho thay thế", desc: "Bỏ qua sản phẩm hết hàng, không thay thế bằng sản phẩm khác", icon: "🚫" },
+                    { id: "call-first", label: "Gọi xác nhận trước khi thay", desc: "Nhân viên sẽ gọi điện xác nhận trước khi thay thế bằng sản phẩm tương đương", icon: "📞" },
+                  ].map((opt) => (
+                    <label
+                      key={opt.id}
+                      className={`block p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                        substitutionPref === opt.id
+                          ? "border-blue-600 bg-blue-50 shadow-sm"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name="substitution"
+                          value={opt.id}
+                          checked={substitutionPref === opt.id}
+                          onChange={() => setSubstitutionPref(opt.id)}
+                          className="w-5 h-5 text-blue-600"
+                        />
+                        <span className="text-lg">{opt.icon}</span>
+                        <div>
+                          <p className="font-semibold">{opt.label}</p>
+                          <p className="text-sm text-gray-500">{opt.desc}</p>
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* ═══ Delivery Note ═══ */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <MessageSquare className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-bold">Ghi chú giao hàng</h3>
+                </div>
+                <textarea
+                  value={deliveryNote}
+                  onChange={(e) => setDeliveryNote(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  placeholder="Ví dụ: Gọi điện trước khi giao, để hàng ở bảo vệ tòa nhà, giao cổng sau..."
+                />
               </div>
 
               <div className="flex gap-4">
@@ -497,7 +647,7 @@ export function Checkout() {
                       className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                         errors.cardName ? "border-red-500" : "border-gray-300"
                       }`}
-                      placeholder="John Doe"
+                      placeholder="NGUYEN VAN A"
                     />
                     {errors.cardName && (
                       <p className="text-red-500 text-sm mt-1">{errors.cardName}</p>
@@ -597,6 +747,11 @@ export function Checkout() {
                   <div className="flex-1">
                     <p className="font-semibold text-sm">{item.product.name}</p>
                     <p className="text-sm text-gray-600">SL: {item.quantity}</p>
+                    {item.product.isPerishable && (
+                      <span className="inline-flex items-center gap-1 text-xs text-orange-600">
+                        🧊 Hàng tươi
+                      </span>
+                    )}
                     <p className="text-sm font-bold">
                       {(item.product.price * item.quantity).toLocaleString("vi-VN")}₫
                     </p>
@@ -605,22 +760,122 @@ export function Checkout() {
               ))}
             </div>
 
+            {/* ── Voucher Input ── */}
+            <div className="border-t pt-4 mb-4">
+              <p className="text-sm font-semibold mb-2 flex items-center gap-1">
+                <Tag className="w-4 h-4 text-blue-600" />
+                Mã Voucher
+              </p>
+              {appliedVoucher ? (
+                <div className="flex items-center gap-2 bg-green-50 border border-green-300 rounded-lg px-3 py-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-green-800">{appliedVoucher.code}</p>
+                    <p className="text-xs text-green-700 truncate">{appliedVoucher.description}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setAppliedVoucher(null);
+                      setVoucherCode("");
+                      setVoucherSuccess("");
+                    }}
+                    className="text-gray-400 hover:text-red-500 flex-shrink-0"
+                    title="Hủy voucher"
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={voucherCode}
+                      onChange={(e) => {
+                        setVoucherCode(e.target.value.toUpperCase());
+                        setVoucherError("");
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const result = validateVoucher(voucherCode.trim(), subtotal, cartCategories);
+                          if (result.valid && result.voucher) {
+                            setAppliedVoucher(result.voucher);
+                            setVoucherError("");
+                            setVoucherSuccess(`Áp dụng thành công! Giảm ${result.voucher.discountType === "fixed" ? result.voucher.discountValue.toLocaleString("vi-VN") + "₫" : result.voucher.discountValue + "%"}`);
+                            toast.success("Đã áp dụng voucher!");
+                          } else {
+                            setVoucherError(result.error || "Voucher không hợp lệ.");
+                          }
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+                      placeholder="Nhập mã voucher"
+                    />
+                    <button
+                      onClick={() => {
+                        const result = validateVoucher(voucherCode.trim(), subtotal, cartCategories);
+                        if (result.valid && result.voucher) {
+                          setAppliedVoucher(result.voucher);
+                          setVoucherError("");
+                          setVoucherSuccess(`Áp dụng thành công!`);
+                          toast.success("Đã áp dụng voucher!");
+                        } else {
+                          setVoucherError(result.error || "Voucher không hợp lệ.");
+                        }
+                      }}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors whitespace-nowrap"
+                    >
+                      Áp dụng
+                    </button>
+                  </div>
+                  {voucherError && (
+                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                      <XCircle className="w-3 h-3" />
+                      {voucherError}
+                    </p>
+                  )}
+                  {voucherSuccess && !voucherError && (
+                    <p className="text-green-600 text-xs mt-1 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      {voucherSuccess}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+
             <div className="border-t pt-4 space-y-2 mb-4">
               <div className="flex justify-between text-gray-700">
                 <span>Tạm tính</span>
                 <span>{subtotal.toLocaleString("vi-VN")}₫</span>
               </div>
+              {voucherDiscount > 0 && (
+                <div className="flex justify-between text-green-700 font-medium">
+                  <span className="flex items-center gap-1">
+                    <Tag className="w-3 h-3" />
+                    Giảm giá ({appliedVoucher?.code})
+                  </span>
+                  <span>-{voucherDiscount.toLocaleString("vi-VN")}₫</span>
+                </div>
+              )}
               <div className="flex justify-between text-gray-700">
                 <span>Thuế (10%)</span>
                 <span>{tax.toLocaleString("vi-VN")}₫</span>
               </div>
               {step >= 2 && (
-                <div className="flex justify-between text-gray-700">
-                  <span>Vận chuyển</span>
-                  <span>
-                    {deliveryFee === 0 ? "MIỄN PHÍ" : `${deliveryFee.toLocaleString("vi-VN")}₫`}
-                  </span>
-                </div>
+                <>
+                  <div className="flex justify-between text-gray-700">
+                    <span>Vận chuyển</span>
+                    <span>
+                      {deliveryFee === 0 ? "MIỄN PHÍ" : `${deliveryFee.toLocaleString("vi-VN")}₫`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-600 text-sm">
+                    <span>Khung giờ</span>
+                    <span>{DELIVERY_SLOTS.find(s => s.id === selectedSlot)?.label} ({DELIVERY_SLOTS.find(s => s.id === selectedSlot)?.timeRange})</span>
+                  </div>
+                </>
               )}
               <div className="border-t pt-2 flex justify-between font-bold text-lg">
                 <span>Tổng cộng</span>

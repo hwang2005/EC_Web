@@ -11,6 +11,10 @@ import { Auth } from "./pages/Auth";
 import { Wishlist } from "./pages/Wishlist";
 import { Profile } from "./pages/Profile";
 import { Contact } from "./pages/Contact";
+import { FarmStory } from "./pages/FarmStory";
+import { Subscription } from "./pages/Subscription";
+import { Loyalty } from "./pages/Loyalty";
+import { IssueCenter } from "./pages/IssueCenter";
 import { NotFound } from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -31,6 +35,10 @@ export const router = createBrowserRouter([
       { path: "wishlist", Component: Wishlist },
       { path: "profile", Component: Profile },
       { path: "contact", Component: Contact },
+      { path: "farm-story", Component: FarmStory },
+      { path: "subscription", Component: Subscription },
+      { path: "loyalty", Component: Loyalty },
+      { path: "issue-center", Component: IssueCenter },
       { path: "admin", Component: Admin },
       { path: "*", Component: NotFound },
     ],

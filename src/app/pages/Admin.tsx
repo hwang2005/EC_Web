@@ -2,17 +2,17 @@ import { useState, useEffect } from "react";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router";
-import { Product, Order, StoreProfile } from "../types";
+import { Product, Order, StoreProfile, Voucher } from "../types";
 import {
   Plus, Edit, Trash2, Save, X, BarChart3, Package,
   ShoppingBag, Star, Settings, AlertTriangle,
   ChevronRight, Clock, Truck, CheckCircle, XCircle,
-  MessageSquare, Store,
+  MessageSquare, Store, CalendarDays, Tag, ToggleLeft, ToggleRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Analytics } from "../components/Analytics";
 
-type Tab = "analytics" | "products" | "orders" | "reviews" | "settings";
+type Tab = "analytics" | "products" | "orders" | "reviews" | "vouchers" | "settings";
 
 export function Admin() {
   const {
@@ -20,6 +20,7 @@ export function Admin() {
     orders, updateOrderStatus, reviews,
     getSellerProducts, getSellerOrders, getSellerReviews,
     storeProfile, updateStoreProfile,
+    vouchers, addVoucher, updateVoucher, deleteVoucher,
   } = useShop();
   const { role, profile } = useAuth();
   const navigate = useNavigate();
@@ -34,6 +35,25 @@ export function Admin() {
 
   // Reviews filtering
   const [reviewProductFilter, setReviewProductFilter] = useState<string>("all");
+
+  // Voucher state
+  const BLANK_VOUCHER: Partial<Voucher> = {
+    code: "",
+    description: "",
+    discountType: "percent",
+    discountValue: 10,
+    minOrderValue: 100000,
+    maxDiscountAmount: undefined,
+    applicableRanks: ["all"],
+    applicableCategories: ["all"],
+    expiryDate: "",
+    isActive: true,
+    usageLimit: undefined,
+    usedCount: 0,
+  };
+  const [voucherForm, setVoucherForm] = useState<Partial<Voucher>>(BLANK_VOUCHER);
+  const [isAddingVoucher, setIsAddingVoucher] = useState(false);
+  const [editingVoucherId, setEditingVoucherId] = useState<string | null>(null);
 
   // Store settings form
   const [storeForm, setStoreForm] = useState<StoreProfile>(storeProfile);
@@ -258,6 +278,60 @@ export function Admin() {
         </div>
       )}
 
+      {/* Expiry / Freshness alert banner */}
+      {(() => {
+        const expiringProducts = sellerProducts.filter((p) => {
+          if (!p.harvestDate || !p.isPerishable) return false;
+          const harvest = new Date(p.harvestDate);
+          const daysSinceHarvest = Math.floor((Date.now() - harvest.getTime()) / (1000 * 60 * 60 * 24));
+          return daysSinceHarvest > 3; // Perishable items harvested more than 3 days ago
+        });
+        if (expiringProducts.length === 0) return null;
+        return (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <CalendarDays className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-red-900">
+                  ⚠️ Cảnh báo hạn sử dụng ({expiringProducts.length} sản phẩm tươi sống)
+                </p>
+                <p className="text-sm text-red-700 mt-1 mb-2">
+                  Các sản phẩm tươi sống dưới đây đã thu hoạch lâu, cần ưu tiên bán hoặc xử lý kịp thời.
+                </p>
+                <div className="space-y-2">
+                  {expiringProducts.map((p) => {
+                    const daysSince = Math.floor((Date.now() - new Date(p.harvestDate!).getTime()) / (1000 * 60 * 60 * 24));
+                    return (
+                      <div key={p.id} className="flex items-center justify-between bg-red-100/50 rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-3">
+                          <img src={p.image} alt={p.name} className="w-8 h-8 rounded object-cover" />
+                          <div>
+                            <p className="text-sm font-semibold text-red-900">{p.name}</p>
+                            <p className="text-xs text-red-700">
+                              Lô: {p.batchCode} • Thu hoạch: {new Date(p.harvestDate!).toLocaleDateString("vi-VN")}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-200 text-red-800 text-xs font-bold rounded-full">
+                            <Clock className="w-3 h-3" />
+                            {daysSince} ngày trước
+                          </span>
+                          <p className="text-xs text-red-600 mt-1">{p.shelfLife}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-red-600 mt-3 italic">
+                  💡 Gợi ý: Áp dụng giảm giá hoặc combo để đẩy nhanh tiêu thụ sản phẩm gần hết hạn.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Tab Navigation */}
       <div className="mb-6 flex gap-1 border-b border-border overflow-x-auto">
         {[
@@ -265,6 +339,7 @@ export function Admin() {
           { id: "products" as Tab, label: "Sản Phẩm", icon: <Package className="w-4 h-4" />, count: sellerProducts.length },
           { id: "orders" as Tab, label: "Đơn Hàng", icon: <ShoppingBag className="w-4 h-4" />, count: pendingOrders + processingOrders },
           { id: "reviews" as Tab, label: "Đánh Giá", icon: <MessageSquare className="w-4 h-4" />, count: sellerReviews.length },
+          { id: "vouchers" as Tab, label: "Voucher", icon: <Tag className="w-4 h-4" />, count: vouchers.filter(v => v.isActive).length },
           { id: "settings" as Tab, label: "Cài Đặt", icon: <Settings className="w-4 h-4" /> },
         ].map((tab) => (
           <button
@@ -485,6 +560,12 @@ export function Admin() {
                             <p className="text-sm text-muted-foreground line-clamp-1">
                               {product.description}
                             </p>
+                            {product.batchCode && (
+                              <p className="text-xs text-blue-600 mt-0.5 font-mono">
+                                Lô: {product.batchCode}
+                                {product.harvestDate && ` • Thu hoạch: ${new Date(product.harvestDate).toLocaleDateString("vi-VN")}`}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -814,6 +895,357 @@ export function Admin() {
               </div>
             </>
           )}
+        </>
+      )}
+
+      {/* ═══════════════════ VOUCHERS TAB ═══════════════════ */}
+      {activeTab === "vouchers" && (
+        <>
+          {/* Header action */}
+          <div className="flex justify-between items-center mb-4">
+            <p className="text-muted-foreground text-sm">
+              Quản lý mã giảm giá. Kiểm tra hạng thành viên và danh mục sản phẩm khi áp dụng.
+            </p>
+            <button
+              onClick={() => { setIsAddingVoucher(true); setEditingVoucherId(null); setVoucherForm(BLANK_VOUCHER); }}
+              className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Tạo Voucher
+            </button>
+          </div>
+
+          {/* Voucher Form */}
+          {(isAddingVoucher || editingVoucherId) && (
+            <div className="bg-white rounded-lg shadow-sm p-6 mb-6 border border-border">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-bold">{isAddingVoucher ? "Tạo Voucher Mới" : "Chỉnh Sửa Voucher"}</h2>
+                <button onClick={() => { setIsAddingVoucher(false); setEditingVoucherId(null); }} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Code */}
+                <div>
+                  <label className="block text-sm font-semibold mb-1">Mã Voucher *</label>
+                  <input
+                    type="text"
+                    value={voucherForm.code || ""}
+                    onChange={(e) => setVoucherForm({ ...voucherForm, code: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-sm uppercase"
+                    placeholder="VD: SUMMER20"
+                  />
+                </div>
+
+                {/* Discount Type */}
+                <div>
+                  <label className="block text-sm font-semibold mb-1">Loại Giảm Giá *</label>
+                  <select
+                    value={voucherForm.discountType || "percent"}
+                    onChange={(e) => setVoucherForm({ ...voucherForm, discountType: e.target.value as "percent" | "fixed" })}
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-sm"
+                  >
+                    <option value="percent">Phần trăm (%)</option>
+                    <option value="fixed">Số tiền cố định (₫)</option>
+                  </select>
+                </div>
+
+                {/* Discount Value */}
+                <div>
+                  <label className="block text-sm font-semibold mb-1">
+                    Giá Trị Giảm * {voucherForm.discountType === "percent" ? "(%)" : "(₫)"}
+                  </label>
+                  <input
+                    type="number"
+                    value={voucherForm.discountValue || ""}
+                    onChange={(e) => setVoucherForm({ ...voucherForm, discountValue: parseFloat(e.target.value) })}
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-sm"
+                    min={1}
+                    max={voucherForm.discountType === "percent" ? 100 : undefined}
+                  />
+                </div>
+
+                {/* Min Order Value */}
+                <div>
+                  <label className="block text-sm font-semibold mb-1">Đơn Hàng Tối Thiểu (₫) *</label>
+                  <input
+                    type="number"
+                    step="10000"
+                    value={voucherForm.minOrderValue ?? ""}
+                    onChange={(e) => setVoucherForm({ ...voucherForm, minOrderValue: parseFloat(e.target.value) })}
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-sm"
+                  />
+                </div>
+
+                {/* Max Discount (only for percent) */}
+                {voucherForm.discountType === "percent" && (
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Giảm Tối Đa (₫, tùy chọn)</label>
+                    <input
+                      type="number"
+                      step="10000"
+                      value={voucherForm.maxDiscountAmount ?? ""}
+                      onChange={(e) => setVoucherForm({ ...voucherForm, maxDiscountAmount: e.target.value ? parseFloat(e.target.value) : undefined })}
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-sm"
+                      placeholder="Để trống = không giới hạn"
+                    />
+                  </div>
+                )}
+
+                {/* Usage Limit */}
+                <div>
+                  <label className="block text-sm font-semibold mb-1">Giới Hạn Sử Dụng (tùy chọn)</label>
+                  <input
+                    type="number"
+                    value={voucherForm.usageLimit ?? ""}
+                    onChange={(e) => setVoucherForm({ ...voucherForm, usageLimit: e.target.value ? parseInt(e.target.value) : undefined })}
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-sm"
+                    placeholder="Để trống = không giới hạn"
+                  />
+                </div>
+
+                {/* Expiry Date */}
+                <div>
+                  <label className="block text-sm font-semibold mb-1">Ngày Hết Hạn *</label>
+                  <input
+                    type="date"
+                    value={voucherForm.expiryDate || ""}
+                    onChange={(e) => setVoucherForm({ ...voucherForm, expiryDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-sm"
+                  />
+                </div>
+
+                {/* Applicable Ranks */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold mb-2">Hạng Thành Viên Áp Dụng</label>
+                  <div className="flex flex-wrap gap-2">
+                    {["all", "standard", "silver", "gold", "platinum"].map((rank) => {
+                      const selected = (voucherForm.applicableRanks || []).includes(rank);
+                      const rankLabel: Record<string, string> = { all: "Tất cả", standard: "Thường", silver: "Bạc", gold: "Vàng", platinum: "Kim Cương" };
+                      return (
+                        <button
+                          key={rank}
+                          type="button"
+                          onClick={() => {
+                            const current = voucherForm.applicableRanks || [];
+                            if (rank === "all") {
+                              setVoucherForm({ ...voucherForm, applicableRanks: ["all"] });
+                            } else {
+                              const without = current.filter(r => r !== "all" && r !== rank);
+                              const next = selected ? without : [...without, rank];
+                              setVoucherForm({ ...voucherForm, applicableRanks: next.length === 0 ? ["all"] : next });
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                            selected ? "bg-primary text-white border-primary" : "bg-background text-muted-foreground border-border hover:border-primary"
+                          }`}
+                        >
+                          {rankLabel[rank]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Applicable Categories */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold mb-2">Danh Mục Sản Phẩm Áp Dụng</label>
+                  <div className="flex flex-wrap gap-2">
+                    {["all", ...Array.from(new Set(products.map(p => p.category)))].map((cat) => {
+                      const selected = (voucherForm.applicableCategories || []).includes(cat);
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            const current = voucherForm.applicableCategories || [];
+                            if (cat === "all") {
+                              setVoucherForm({ ...voucherForm, applicableCategories: ["all"] });
+                            } else {
+                              const without = current.filter(c => c !== "all" && c !== cat);
+                              const next = selected ? without : [...without, cat];
+                              setVoucherForm({ ...voucherForm, applicableCategories: next.length === 0 ? ["all"] : next });
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                            selected ? "bg-primary text-white border-primary" : "bg-background text-muted-foreground border-border hover:border-primary"
+                          }`}
+                        >
+                          {cat === "all" ? "Tất cả" : cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold mb-1">Mô Tả *</label>
+                  <input
+                    type="text"
+                    value={voucherForm.description || ""}
+                    onChange={(e) => setVoucherForm({ ...voucherForm, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-sm"
+                    placeholder="Mô tả ngắn gọn về voucher này"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => {
+                    // Validation
+                    if (!voucherForm.code?.trim()) { toast.error("Cần nhập mã voucher"); return; }
+                    if (!voucherForm.discountValue || voucherForm.discountValue <= 0) { toast.error("Cần nhập giá trị giảm giá hợp lệ"); return; }
+                    if (!voucherForm.expiryDate) { toast.error("Cần chọn ngày hết hạn"); return; }
+                    if (!voucherForm.description?.trim()) { toast.error("Cần nhập mô tả"); return; }
+                    if (voucherForm.minOrderValue === undefined || voucherForm.minOrderValue < 0) { toast.error("Cần nhập giá trị đơn hàng tối thiểu"); return; }
+
+                    if (isAddingVoucher) {
+                      // Check duplicate code
+                      if (vouchers.some(v => v.code.toUpperCase() === voucherForm.code?.toUpperCase())) {
+                        toast.error("Mã voucher này đã tồn tại");
+                        return;
+                      }
+                      addVoucher({
+                        ...voucherForm,
+                        id: `vc-${Date.now()}`,
+                        usedCount: 0,
+                        isActive: true,
+                      } as Voucher);
+                      toast.success("Tạo voucher thành công");
+                    } else if (editingVoucherId) {
+                      updateVoucher({ ...voucherForm, id: editingVoucherId } as Voucher);
+                      toast.success("Cập nhật voucher thành công");
+                    }
+                    setIsAddingVoucher(false);
+                    setEditingVoucherId(null);
+                  }}
+                  className="flex items-center gap-2 bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+                >
+                  <Save className="w-4 h-4" />
+                  {isAddingVoucher ? "Tạo Voucher" : "Lưu Thay Đổi"}
+                </button>
+                <button
+                  onClick={() => { setIsAddingVoucher(false); setEditingVoucherId(null); }}
+                  className="border border-border px-5 py-2 rounded-lg hover:bg-muted transition-colors text-sm"
+                >
+                  Hủy
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Voucher List */}
+          <div className="bg-white rounded-lg shadow-sm border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted border-b border-border">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-foreground">Mã</th>
+                    <th className="text-left px-4 py-3 text-foreground">Mô Tả</th>
+                    <th className="text-left px-4 py-3 text-foreground">Giảm Giá</th>
+                    <th className="text-left px-4 py-3 text-foreground">Hạng</th>
+                    <th className="text-left px-4 py-3 text-foreground">Danh Mục</th>
+                    <th className="text-left px-4 py-3 text-foreground">Hết Hạn</th>
+                    <th className="text-center px-4 py-3 text-foreground">Sử Dụng</th>
+                    <th className="text-center px-4 py-3 text-foreground">Trạng Thái</th>
+                    <th className="text-right px-4 py-3 text-foreground">Hành Động</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {vouchers.length === 0 && (
+                    <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">
+                      <Tag className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                      <p>Chưa có voucher nào.
+                    </p></td></tr>
+                  )}
+                  {vouchers.map((v) => {
+                    const isExpired = new Date(v.expiryDate) < new Date();
+                    const rankColors: Record<string, string> = { all: "bg-gray-100 text-gray-700", standard: "bg-gray-100 text-gray-700", silver: "bg-slate-100 text-slate-700", gold: "bg-yellow-100 text-yellow-800", platinum: "bg-purple-100 text-purple-800" };
+                    return (
+                      <tr key={v.id} className={`hover:bg-muted/40 ${!v.isActive || isExpired ? "opacity-50" : ""}`}>
+                        <td className="px-4 py-3">
+                          <span className="font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">{v.code}</span>
+                        </td>
+                        <td className="px-4 py-3 max-w-[180px]">
+                          <p className="truncate text-foreground">{v.description}</p>
+                          {v.minOrderValue > 0 && (
+                            <p className="text-xs text-muted-foreground">Tối thiểu: {v.minOrderValue.toLocaleString("vi-VN")}₫</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-green-700">
+                          {v.discountType === "percent" ? `${v.discountValue}%` : `${v.discountValue.toLocaleString("vi-VN")}₫`}
+                          {v.maxDiscountAmount && (
+                            <p className="text-xs text-muted-foreground font-normal">tối đa {v.maxDiscountAmount.toLocaleString("vi-VN")}₫</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {v.applicableRanks.map(r => (
+                              <span key={r} className={`inline-block text-xs px-1.5 py-0.5 rounded-full font-medium ${rankColors[r] || "bg-gray-100 text-gray-700"}`}>
+                                {r === "all" ? "Tất cả" : r === "standard" ? "Thường" : r === "silver" ? "Bạc" : r === "gold" ? "Vàng" : "Kim Cương"}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {v.applicableCategories.map(c => (
+                              <span key={c} className="inline-block text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full">
+                                {c === "all" ? "Tất cả" : c}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={isExpired ? "text-red-600 font-semibold" : "text-foreground"}>
+                            {new Date(v.expiryDate).toLocaleDateString("vi-VN")}
+                            {isExpired && <span className="block text-xs text-red-500">Hết hạn</span>}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="font-semibold">{v.usedCount}</span>
+                          {v.usageLimit && <span className="text-muted-foreground">/{v.usageLimit}</span>}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => updateVoucher({ ...v, isActive: !v.isActive })}
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold transition-colors ${
+                              v.isActive ? "bg-green-100 text-green-800 hover:bg-green-200" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            }`}
+                            title={v.isActive ? "Vô hiệu hóa" : "Kích hoạt"}
+                          >
+                            {v.isActive ? <ToggleRight className="w-3 h-3" /> : <ToggleLeft className="w-3 h-3" />}
+                            {v.isActive ? "Hoạt động" : "Tắt"}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-1">
+                            <button
+                              onClick={() => { setEditingVoucherId(v.id); setVoucherForm({ ...v }); setIsAddingVoucher(false); }}
+                              className="p-1.5 text-primary hover:bg-accent rounded transition-colors"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Xóa voucher "${v.code}"?`)) { deleteVoucher(v.id); toast.success("Xóa voucher thành công"); }
+                              }}
+                              className="p-1.5 text-destructive hover:bg-destructive/10 rounded transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </>
       )}
 
