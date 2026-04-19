@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { Chatbot } from "./Chatbot";
 
 export function Layout() {
-  const { getCartCount, wishlist } = useShop();
+  const { getCartCount, wishlist, products, orders } = useShop();
   const { role, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -113,7 +113,7 @@ export function Layout() {
                   </Link>
                   <Link
                     to="/admin"
-                    className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors relative ${
                       isActive("/admin")
                         ? "text-primary bg-accent"
                         : "text-foreground hover:text-primary hover:bg-muted"
@@ -121,6 +121,22 @@ export function Layout() {
                   >
                     <BarChart3 className="w-4 h-4" />
                     Quản Lý Kênh Bán
+                    {(() => {
+                      const sellerEmail = localStorage.getItem("current_user_email") || "";
+                      const sellerProductIds = new Set(
+                        products.filter((p) => p.sellerId?.toLowerCase() === sellerEmail.toLowerCase()).map((p) => p.id)
+                      );
+                      const pendingCount = orders.filter(
+                        (o) =>
+                          (o.status === "pending" || o.status === "processing") &&
+                          o.items.some((item) => sellerProductIds.has(item.product.id))
+                      ).length;
+                      return pendingCount > 0 ? (
+                        <span className="absolute -top-1 -right-1 bg-destructive text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                          {pendingCount}
+                        </span>
+                      ) : null;
+                    })()}
                   </Link>
                 </>
               )}

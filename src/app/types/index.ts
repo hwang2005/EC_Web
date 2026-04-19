@@ -7,6 +7,7 @@ export interface Product {
   category: string;
   stock: number;
   rating: number;
+  sellerId: string;
 }
 
 export interface CartItem {
@@ -47,6 +48,7 @@ export interface Order {
   paymentMethod: string;
   orderDate: string;
   estimatedDelivery: string;
+  buyerEmail: string;
 }
 
 export interface Review {
@@ -70,4 +72,12 @@ export interface RegisteredUser {
   phone: string;
   password: string;
   role: "consumer" | "seller";
+}
+
+export interface StoreProfile {
+  shopName: string;
+  shopDescription: string;
+  shopAddress: string;
+  shopPhone: string;
+  shopEmail: string;
 }

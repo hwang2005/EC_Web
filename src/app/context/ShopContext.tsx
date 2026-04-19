@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { Product, CartItem, Order, Review } from "../types";
+import { Product, CartItem, Order, Review, StoreProfile } from "../types";
 import { PRODUCTS, CustomerTier } from "../data/products";
 
 interface ShopContextType {
@@ -15,6 +15,7 @@ interface ShopContextType {
   clearCart: () => void;
   placeOrder: (order: Order) => void;
   cancelOrder: (orderId: string) => boolean;
+  updateOrderStatus: (orderId: string, status: Order["status"]) => void;
   addProduct: (product: Product) => void;
   updateProduct: (product: Product) => void;
   deleteProduct: (productId: string) => void;
@@ -27,9 +28,24 @@ interface ShopContextType {
   isInWishlist: (productId: string) => boolean;
   addReview: (review: Review) => void;
   getProductReviews: (productId: string) => Review[];
+  // Seller-scoped helpers
+  getSellerProducts: (sellerEmail: string) => Product[];
+  getSellerOrders: (sellerEmail: string) => Order[];
+  getSellerReviews: (sellerEmail: string) => Review[];
+  // Store profile
+  storeProfile: StoreProfile;
+  updateStoreProfile: (profile: StoreProfile) => void;
 }
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
+
+const DEFAULT_STORE_PROFILE: StoreProfile = {
+  shopName: "Nông Sản Việt",
+  shopDescription: "Chuyên cung cấp nông sản sạch, chất lượng cao từ khắp các vùng miền Việt Nam.",
+  shopAddress: "123 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh",
+  shopPhone: "0912 345 678",
+  shopEmail: "seller@demo.com",
+};
 
 export function ShopProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<Product[]>(() => {
@@ -70,6 +86,11 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     return (stored as CustomerTier) || "standard";
   });
 
+  const [storeProfile, setStoreProfile] = useState<StoreProfile>(() => {
+    const stored = localStorage.getItem("storeProfile");
+    return stored ? JSON.parse(stored) : DEFAULT_STORE_PROFILE;
+  });
+
   // Persist to localStorage
   useEffect(() => {
     localStorage.setItem("products", JSON.stringify(products));
@@ -94,6 +115,10 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem("customerTier", customerTier);
   }, [customerTier]);
+
+  useEffect(() => {
+    localStorage.setItem("storeProfile", JSON.stringify(storeProfile));
+  }, [storeProfile]);
 
   const getPersonalizedPrice = (price: number) => {
     const discounts = {
@@ -164,6 +189,12 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     return true;
   };
 
+  const updateOrderStatus = (orderId: string, status: Order["status"]) => {
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, status } : o))
+    );
+  };
+
   const addProduct = (product: Product) => {
     setProducts((prev) => [...prev, product]);
   };
@@ -211,6 +242,34 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     return reviews.filter((r) => r.productId === productId);
   };
 
+  // Seller-scoped helpers
+  const getSellerProducts = (sellerEmail: string) => {
+    return products.filter(
+      (p) => p.sellerId?.toLowerCase() === sellerEmail.toLowerCase()
+    );
+  };
+
+  const getSellerOrders = (sellerEmail: string) => {
+    // An order belongs to a seller if any item in the order is from that seller's products
+    const sellerProductIds = new Set(
+      getSellerProducts(sellerEmail).map((p) => p.id)
+    );
+    return orders.filter((order) =>
+      order.items.some((item) => sellerProductIds.has(item.product.id))
+    );
+  };
+
+  const getSellerReviews = (sellerEmail: string) => {
+    const sellerProductIds = new Set(
+      getSellerProducts(sellerEmail).map((p) => p.id)
+    );
+    return reviews.filter((r) => sellerProductIds.has(r.productId));
+  };
+
+  const updateStoreProfile = (profile: StoreProfile) => {
+    setStoreProfile(profile);
+  };
+
   return (
     <ShopContext.Provider
       value={{
@@ -226,6 +285,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         clearCart,
         placeOrder,
         cancelOrder,
+        updateOrderStatus,
         addProduct,
         updateProduct,
         deleteProduct,
@@ -238,6 +298,11 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         isInWishlist,
         addReview,
         getProductReviews,
+        getSellerProducts,
+        getSellerOrders,
+        getSellerReviews,
+        storeProfile,
+        updateStoreProfile,
       }}
     >
       {children}

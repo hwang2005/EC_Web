@@ -139,6 +139,7 @@ export function Checkout() {
         paymentMethod: PAYMENT_METHODS.find(p => p.id === selectedPayment)?.name || "",
         orderDate: orderDate.toISOString(),
         estimatedDelivery: estimatedDelivery.toISOString(),
+        buyerEmail: localStorage.getItem("current_user_email") || "",
       };
 
       placeOrder(order);

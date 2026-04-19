@@ -1,5 +1,7 @@
 import { Product } from "../types";
 
+export const DEMO_SELLER_EMAIL = "seller@demo.com";
+
 export const PRODUCTS: Product[] = [
   {
     id: "1",
@@ -9,7 +11,8 @@ export const PRODUCTS: Product[] = [
     image: "https://image2url.com/r2/default/images/1775754104769-198594d5-39f6-4ab1-a249-7789a5451289.png",
     category: "Gạo (Rice)",
     stock: 450,
-    rating: 4.9
+    rating: 4.9,
+    sellerId: DEMO_SELLER_EMAIL,
   },
   {
     id: "2",
@@ -19,7 +22,8 @@ export const PRODUCTS: Product[] = [
     image: "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=500&q=80",
     category: "Cà Phê (Coffee)",
     stock: 320,
-    rating: 4.8
+    rating: 4.8,
+    sellerId: DEMO_SELLER_EMAIL,
   },
   {
     id: "3",
@@ -29,7 +33,8 @@ export const PRODUCTS: Product[] = [
     image: "https://images.unsplash.com/photo-1527325678964-54921661f888?w=500&q=80",
     category: "Trái Cây (Fruits)",
     stock: 280,
-    rating: 4.7
+    rating: 4.7,
+    sellerId: DEMO_SELLER_EMAIL,
   },
   {
     id: "4",
@@ -39,7 +44,8 @@ export const PRODUCTS: Product[] = [
     image: "https://image2url.com/r2/default/images/1775754429359-10240ed4-a7f5-44ee-b8d2-a658526edcda.png",
     category: "Gia Vị (Spices)",
     stock: 180,
-    rating: 4.9
+    rating: 4.9,
+    sellerId: DEMO_SELLER_EMAIL,
   },
   {
     id: "5",
@@ -49,7 +55,8 @@ export const PRODUCTS: Product[] = [
     image: "https://images.unsplash.com/photo-1566281796817-93bc94d7dbd2?w=500&q=80",
     category: "Trái Cây (Fruits)",
     stock: 220,
-    rating: 4.6
+    rating: 4.6,
+    sellerId: DEMO_SELLER_EMAIL,
   },
   {
     id: "6",
@@ -59,7 +66,8 @@ export const PRODUCTS: Product[] = [
     image: "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&q=80",
     category: "Rau Củ (Vegetables)",
     stock: 350,
-    rating: 4.8
+    rating: 4.8,
+    sellerId: DEMO_SELLER_EMAIL,
   },
   {
     id: "7",
@@ -69,7 +77,8 @@ export const PRODUCTS: Product[] = [
     image: "https://images.unsplash.com/photo-1553279768-865429fa0078?w=500&q=80",
     category: "Trái Cây (Fruits)",
     stock: 190,
-    rating: 4.9
+    rating: 4.9,
+    sellerId: DEMO_SELLER_EMAIL,
   },
   {
     id: "8",
@@ -79,7 +88,8 @@ export const PRODUCTS: Product[] = [
     image: "https://images.unsplash.com/photo-1634141510639-d691d86f47be?w=500&q=80",
     category: "Gia Vị (Spices)",
     stock: 260,
-    rating: 4.8
+    rating: 4.8,
+    sellerId: DEMO_SELLER_EMAIL,
   },
   {
     id: "9",
@@ -89,7 +99,8 @@ export const PRODUCTS: Product[] = [
     image: "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=500&q=80",
     category: "Ngũ Cốc (Grains)",
     stock: 140,
-    rating: 4.7
+    rating: 4.7,
+    sellerId: DEMO_SELLER_EMAIL,
   },
   {
     id: "10",
@@ -99,7 +110,8 @@ export const PRODUCTS: Product[] = [
     image: "https://images.unsplash.com/photo-1587049352846-4a222e784422?w=500&q=80",
     category: "Đặc Sản (Specialty)",
     stock: 110,
-    rating: 4.6
+    rating: 4.6,
+    sellerId: DEMO_SELLER_EMAIL,
   },
   {
     id: "11",
@@ -109,7 +121,8 @@ export const PRODUCTS: Product[] = [
     image: "https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=500&q=80",
     category: "Trà (Tea)",
     stock: 175,
-    rating: 4.9
+    rating: 4.9,
+    sellerId: DEMO_SELLER_EMAIL,
   },
   {
     id: "12",
@@ -119,7 +132,8 @@ export const PRODUCTS: Product[] = [
     image: "https://images.unsplash.com/photo-1577234286642-fc512a5f8f11?w=500&q=80",
     category: "Trái Cây (Fruits)",
     stock: 200,
-    rating: 4.7
+    rating: 4.7,
+    sellerId: DEMO_SELLER_EMAIL,
   }
 ];
 
