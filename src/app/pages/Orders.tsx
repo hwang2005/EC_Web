@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
-import { Package, Truck, CheckCircle, XCircle, Clock, AlertTriangle, ShoppingCart, RotateCcw } from "lucide-react";
+import { Package, Truck, CheckCircle, XCircle, Clock, AlertTriangle, ShoppingCart, RotateCcw, MessageSquareDashed } from "lucide-react";
 import { Order } from "../types";
 import { toast } from "sonner";
 
@@ -133,15 +133,17 @@ export function Orders() {
   const { role } = useAuth();
   const { orders, cancelOrder, addToCart, products } = useShop();
   const navigate = useNavigate();
+  const currentUserEmail = localStorage.getItem("current_user_email") || "";
+  const userOrders = orders.filter((order) => order.buyerEmail === currentUserEmail);
 
   // Force a re-render every second so the cancellable check stays fresh
   const [, setTick] = useState(0);
   useEffect(() => {
-    const hasCancellable = orders.some(isCancellable);
+    const hasCancellable = userOrders.some(isCancellable);
     if (!hasCancellable) return;
     const timer = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(timer);
-  }, [orders]);
+  }, [userOrders]);
 
   const handleCancelOrder = useCallback(
     (orderId: string) => {
@@ -257,7 +259,7 @@ export function Orders() {
     }
   };
 
-  if (orders.length === 0) {
+  if (userOrders.length === 0) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center">
@@ -282,13 +284,23 @@ export function Orders() {
       <h1 className="text-3xl font-bold mb-8">Lịch Sử Đơn Hàng</h1>
 
       <div className="space-y-6">
-        {orders.map((order) => (
+        {userOrders.map((order) => (
           <div key={order.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
             {/* Order Header */}
             <div className="bg-gray-50 px-6 py-4 border-b">
               <div className="flex flex-wrap justify-between items-center gap-4">
                 <div>
                   <p className="font-semibold text-lg">{order.id}</p>
+                  {order.isSubscriptionOrder && (
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                        Định kỳ
+                      </span>
+                      {order.subscriptionPlanName && (
+                        <span className="text-xs text-gray-600">{order.subscriptionPlanName}</span>
+                      )}
+                    </div>
+                  )}
                   <p className="text-sm text-gray-600">
                     Đặt lúc {new Date(order.orderDate).toLocaleDateString("vi-VN")}
                   </p>
@@ -336,6 +348,14 @@ export function Orders() {
                       <span className="font-semibold">Phương thức:</span>{" "}
                       {order.deliveryOption.name}
                     </p>
+                    {order.isSubscriptionOrder && order.subscriptionPlanName && (
+                      <p>
+                        <span className="font-semibold">Gói:</span>{" "}
+                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-xs font-medium">
+                          {order.subscriptionPlanName}
+                        </span>
+                      </p>
+                    )}
                     <p>
                       <span className="font-semibold">Dự kiến:</span>{" "}
                       {new Date(order.estimatedDelivery).toLocaleDateString("vi-VN")}
@@ -479,6 +499,25 @@ export function Orders() {
                       <ShoppingCart className="w-4 h-4" />
                       Mua Lại
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ═══ Report Quality Issue Button ═══ */}
+              {(order.status === "delivered" || order.status === "shipped") && (
+                <div className="mt-4 pt-4 border-t border-dashed border-red-100">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MessageSquareDashed className="w-4 h-4 text-red-500" />
+                      <span>Có vấn đề về chất lượng sản phẩm?</span>
+                    </div>
+                    <Link
+                      to={`/issue-center?orderId=${order.id}`}
+                      className="flex items-center gap-2 px-4 py-2 border-2 border-red-300 text-red-600 text-sm font-semibold rounded-lg hover:bg-red-50 hover:border-red-400 transition-colors"
+                    >
+                      <AlertTriangle className="w-4 h-4" />
+                      Báo vấn đề chất lượng
+                    </Link>
                   </div>
                 </div>
               )}

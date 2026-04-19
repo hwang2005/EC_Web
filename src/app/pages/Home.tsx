@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { Sprout, Truck, CreditCard, ArrowRight, Leaf, Award, ShieldCheck, MapPin, CalendarDays, Package, Clock, Home as HomeIcon, MessageCircle } from "lucide-react";
+import { Sprout, Truck, CreditCard, ArrowRight, Leaf, Award, ShieldCheck, MapPin, CalendarDays, Package, Clock, MessageCircle, Thermometer, RotateCcw, CheckCircle2 } from "lucide-react";
 import { useShop } from "../context/ShopContext";
 import { SEASONAL_CALENDAR, FARM_STORIES } from "../data/products";
 
@@ -52,13 +52,40 @@ export function Home() {
         </div>
       </section>
 
+      {/* ═══ Delivery Coverage Strip ═══ */}
+      <section className="bg-gradient-to-r from-emerald-800 to-green-700 text-white py-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm font-medium">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-emerald-300 shrink-0" />
+              <span>Giao nội thành <strong>TP.HCM &amp; Hà Nội</strong></span>
+            </div>
+            <div className="hidden sm:block w-px h-4 bg-white/30" />
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-emerald-300 shrink-0" />
+              <span>Đặt trước <strong>14:00</strong> — giao <strong>ngay hôm nay</strong></span>
+            </div>
+            <div className="hidden sm:block w-px h-4 bg-white/30" />
+            <div className="flex items-center gap-2">
+              <Thermometer className="w-4 h-4 text-emerald-300 shrink-0" />
+              <span>Bảo quản <strong>lạnh</strong> suốt hành trình giao</span>
+            </div>
+            <div className="hidden sm:block w-px h-4 bg-white/30" />
+            <div className="flex items-center gap-2">
+              <RotateCcw className="w-4 h-4 text-emerald-300 shrink-0" />
+              <span>Đổi / hoàn tiền <strong>trong 24h</strong> nếu không đạt</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ═══ Trust Strip ═══ */}
       <section className="py-6 bg-white border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { icon: <MapPin className="w-6 h-6 text-green-600" />, title: "Nguồn Gốc Rõ Ràng", desc: "Truy xuất từ nông trại", bg: "bg-green-50" },
-              { icon: <Truck className="w-6 h-6 text-blue-600" />, title: "Giao Hàng Nhanh", desc: "Giao trong ngày nội thành", bg: "bg-blue-50" },
+              { icon: <Truck className="w-6 h-6 text-blue-600" />, title: "Giao Hàng Nhanh", desc: "Giao trong ngày (đối với khu vực nội thành TP.HCM và Hà Nội)", bg: "bg-blue-50" },
               { icon: <ShieldCheck className="w-6 h-6 text-amber-600" />, title: "Đổi Trả Dễ Dàng", desc: "Hoàn 100% nếu hàng hỏng", bg: "bg-amber-50" },
               { icon: <CreditCard className="w-6 h-6 text-purple-600" />, title: "Thanh Toán An Toàn", desc: "Mã hóa SSL/TLS", bg: "bg-purple-50" },
             ].map((item) => (
@@ -370,6 +397,112 @@ export function Home() {
                 </div>
               </Link>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ Repeat Purchase Combos — "Combo Mua Lại Hàng Tuần" ═══ */}
+      <section className="py-16 bg-gradient-to-br from-teal-50 to-cyan-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-teal-100 rounded-full text-teal-700 text-sm font-semibold mb-4">
+              <RotateCcw className="w-4 h-4" />
+              Mua lại tiện hơn
+            </div>
+            <h2 className="text-foreground font-bold">Combo Đặt Hàng Định Kỳ</h2>
+            <p className="text-muted-foreground mt-2 max-w-2xl mx-auto">
+              Đăng ký một lần, nhận hàng đều đặn. Tiết kiệm thời gian đi chợ, luôn có thực phẩm tươi sạch cho gia đình.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                icon: "🥬",
+                name: "Combo Rau Gia Đình",
+                freq: "Hàng tuần",
+                price: 250_000,
+                color: "from-green-500 to-emerald-600",
+                bg: "bg-green-50",
+                border: "border-green-200",
+                badge: "Phổ biến nhất",
+                badgeBg: "bg-green-600",
+                items: ["Rau hữu cơ Đà Lạt", "Cà chua bi", "Dưa leo", "Bông cải"],
+              },
+              {
+                icon: "🍉",
+                name: "Combo Trái Cây Mùa",
+                freq: "2 tuần / lần",
+                price: 350_000,
+                color: "from-orange-500 to-amber-600",
+                bg: "bg-orange-50",
+                border: "border-orange-200",
+                badge: "Theo mùa vụ",
+                badgeBg: "bg-orange-500",
+                items: ["Xoài Cát Hòa Lộc", "Thanh Long Ruột Đỏ", "Chôm Chôm", "Bưởi da xanh"],
+              },
+              {
+                icon: "🎁",
+                name: "Combo Đặc Sản Vùng Miền",
+                freq: "Hàng tháng",
+                price: 500_000,
+                color: "from-purple-500 to-indigo-600",
+                bg: "bg-purple-50",
+                border: "border-purple-200",
+                badge: "Khám phá vùng miền",
+                badgeBg: "bg-purple-600",
+                items: ["Hồ Tiêu Phú Quốc", "Trà Thái Nguyên", "Nước Mắm Phú Quốc", "Mắc Khén Tây Bắc"],
+              },
+            ].map((combo) => (
+              <div
+                key={combo.name}
+                className={`bg-white rounded-xl border-2 ${combo.border} shadow-sm hover:shadow-lg transition-all overflow-hidden group`}
+              >
+                {/* Card Header */}
+                <div className={`bg-gradient-to-r ${combo.color} p-5 text-white`}>
+                  <div className="flex items-start justify-between mb-2">
+                    <span className="text-4xl">{combo.icon}</span>
+                    <span className={`${combo.badgeBg} bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-full`}>
+                      {combo.badge}
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-lg leading-tight">{combo.name}</h3>
+                  <p className="text-white/80 text-sm mt-1">{combo.freq}</p>
+                </div>
+                {/* Price + Items */}
+                <div className="p-5">
+                  <div className="flex items-baseline gap-1 mb-4">
+                    <span className="text-2xl font-bold text-foreground">
+                      {combo.price.toLocaleString("vi-VN")}₫
+                    </span>
+                    <span className="text-muted-foreground text-sm">/ {combo.freq.toLowerCase()}</span>
+                  </div>
+                  <ul className="space-y-1.5 mb-5">
+                    {combo.items.map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm text-foreground">
+                        <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                        {item}
+                      </li>
+                    ))}
+                    <li className="text-xs text-muted-foreground italic pl-6">+ nhiều sản phẩm khác theo mùa...</li>
+                  </ul>
+                  <Link
+                    to="/subscription"
+                    className={`block w-full text-center py-2.5 rounded-lg font-semibold text-sm transition-all bg-gradient-to-r ${combo.color} text-white hover:opacity-90 hover:shadow-md`}
+                  >
+                    Đăng Ký Gói Này →
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 text-center">
+            <Link
+              to="/subscription"
+              className="inline-flex items-center gap-2 text-teal-700 hover:text-teal-800 font-semibold"
+            >
+              Xem tất cả gói định kỳ
+              <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         </div>
       </section>

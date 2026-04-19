@@ -42,40 +42,64 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
+  /* ── Deep backgrounds ────────────────────────────────────── */
+  --background: #0d1a0e;
+  --foreground: #e8f5e9;
+
+  /* ── Cards / Popovers ─────────────────────────────────── */
+  --card: #132015;
+  --card-foreground: #e8f5e9;
+  --popover: #1a2e1c;
+  --popover-foreground: #e8f5e9;
+
+  /* ── Primary: giữ nguyên màu xanh gốc như Trợ Lý ─────── */
+  --primary: #4a7c2f;
+  --primary-foreground: #ffffff;
+
+  /* ── Secondary: warm amber ────────────────────────────── */
+  --secondary: #d4a574;
+  --secondary-foreground: #0a1a0b;
+
+  /* ── Muted surfaces ───────────────────────────────────── */
+  --muted: #1e301f;
+  --muted-foreground: #8db88f;
+
+  /* ── Accent: giữ nguyên màu xanh lá sáng gốc ─────────── */
+  --accent: #8fbc5a;
+  --accent-foreground: #ffffff;
+
+  /* ── Destructive ──────────────────────────────────────── */
+  --destructive: #f44336;
+  --destructive-foreground: #ffffff;
+
+  /* ── Borders / Inputs ─────────────────────────────────── */
+  --border: rgba(143, 188, 90, 0.25);
+  --input: #1e301f;
+  --input-background: #1a2e1c;
+  --switch-background: #2e5c30;
+
+  /* ── Focus ring ───────────────────────────────────────── */
+  --ring: #6a9c42;
+
+  /* ── Chart palette  ───────────────────────────────────── */
+  --chart-1: #8fbc5a;
+  --chart-2: #00c896;
+  --chart-3: #f0a500;
+  --chart-4: #4fc3f7;
+  --chart-5: #ff7043;
+
+  /* ── Sidebar ──────────────────────────────────────────── */
+  --sidebar: #101f11;
+  --sidebar-foreground: #e8f5e9;
+  --sidebar-primary: #4a7c2f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e301f;
+  --sidebar-accent-foreground: #e8f5e9;
+  --sidebar-border: rgba(143, 188, 90, 0.18);
+  --sidebar-ring: #6a9c42;
+
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
 }
 
 @theme inline {
@@ -179,3 +203,211 @@
     line-height: 1.5;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   GLOBAL DARK MODE OVERRIDES
+   Covers all hardcoded Tailwind bg-white, bg-gray-*, bg-*-50 etc.
+   used across page components without modifying each file.
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Smooth transition for theme changes ──────────────────── */
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dark * {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease;
+}
+
+/* ── White backgrounds → dark card ───────────────────────── */
+.dark .bg-white,
+.dark .bg-white\/95,
+.dark .bg-white\/98,
+.dark .bg-white\/90 {
+  background-color: var(--card) !important;
+}
+
+/* ── Light gray surfaces ──────────────────────────────────── */
+.dark .bg-gray-50,
+.dark .bg-gray-100,
+.dark .bg-slate-50,
+.dark .bg-slate-100,
+.dark .bg-zinc-50,
+.dark .bg-zinc-100,
+.dark .bg-neutral-50,
+.dark .bg-neutral-100 {
+  background-color: #1a2e1c !important;
+}
+
+.dark .bg-gray-200,
+.dark .bg-slate-200 {
+  background-color: #1e301f !important;
+}
+
+.dark .bg-gray-800,
+.dark .bg-gray-900 {
+  background-color: #050e06 !important;
+}
+
+/* ── Green tinted backgrounds ─────────────────────────────── */
+.dark .bg-green-50,
+.dark .bg-emerald-50,
+.dark .bg-teal-50,
+.dark .bg-lime-50,
+.dark .bg-green-100,
+.dark .bg-emerald-100,
+.dark .bg-teal-100 {
+  background-color: #152118 !important;
+  border-color: rgba(109, 235, 90, 0.15) !important;
+}
+
+/* ── Warm tinted backgrounds ──────────────────────────────── */
+.dark .bg-amber-50,
+.dark .bg-orange-50,
+.dark .bg-yellow-50,
+.dark .bg-amber-100,
+.dark .bg-orange-100 {
+  background-color: #1f1a0e !important;
+  border-color: rgba(240, 165, 0, 0.2) !important;
+}
+
+/* ── Blue tinted backgrounds ──────────────────────────────── */
+.dark .bg-blue-50,
+.dark .bg-sky-50,
+.dark .bg-indigo-50,
+.dark .bg-blue-100 {
+  background-color: #0e1a2e !important;
+}
+
+/* ── Purple tinted backgrounds ────────────────────────────── */
+.dark .bg-purple-50,
+.dark .bg-violet-50,
+.dark .bg-purple-100 {
+  background-color: #1a0e2e !important;
+  border-color: rgba(139, 92, 246, 0.2) !important;
+}
+
+/* ── Gradient overrides ───────────────────────────────────── */
+.dark .bg-gradient-to-br.from-green-50,
+.dark .bg-gradient-to-r.from-green-50,
+.dark .bg-gradient-to-br.from-emerald-50,
+.dark .bg-gradient-to-br.from-amber-50,
+.dark .bg-gradient-to-br.from-teal-50 {
+  background-image: none !important;
+  background-color: #0d1a0e !important;
+}
+
+.dark .bg-gradient-to-br.from-purple-50 {
+  background-image: none !important;
+  background-color: #110c1f !important;
+}
+
+/* ── Text overrides ───────────────────────────────────────── */
+.dark .text-gray-400 {
+  color: #8db88f !important;
+}
+
+.dark .text-gray-500,
+.dark .text-gray-600 {
+  color: #7aab7c !important;
+}
+
+.dark .text-gray-700,
+.dark .text-gray-800,
+.dark .text-gray-900 {
+  color: #c8e6ca !important;
+}
+
+/* Giữ màu xanh lá gần giống gốc — chỉ sáng nhẹ cho dễ đọc trên nền tối */
+.dark .text-green-700,
+.dark .text-green-800 {
+  color: #8fbc5a !important;
+}
+
+.dark .text-green-600 {
+  color: #8fbc5a !important;
+}
+
+.dark .text-teal-700 {
+  color: #5fc38a !important;
+}
+
+.dark .text-purple-600,
+.dark .text-purple-700 {
+  color: #c084fc !important;
+}
+
+/* ── Border colors ────────────────────────────────────────── */
+.dark .border-green-100,
+.dark .border-green-200 {
+  border-color: rgba(74, 124, 47, 0.3) !important;
+}
+
+.dark .border-amber-100,
+.dark .border-amber-200,
+.dark .border-orange-200 {
+  border-color: rgba(212, 165, 116, 0.25) !important;
+}
+
+.dark .border-purple-100,
+.dark .border-purple-200 {
+  border-color: rgba(139, 92, 246, 0.2) !important;
+}
+
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300 {
+  border-color: rgba(143, 188, 90, 0.15) !important;
+}
+
+.dark .border-gray-800 {
+  border-color: rgba(74, 124, 47, 0.15) !important;
+}
+
+/* ── Badge / pill backgrounds ─────────────────────────────── */
+.dark .bg-green-100 {
+  background-color: #152118 !important;
+}
+
+.dark .text-green-800 {
+  color: #8fbc5a !important;
+}
+
+.dark .bg-teal-100 {
+  background-color: #0d1f1e !important;
+}
+
+.dark .bg-purple-50 {
+  background-color: #1a0e2e !important;
+}
+
+/* ── Input / form fields ──────────────────────────────────── */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: var(--input-background) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--muted-foreground) !important;
+}
+
+/* ── Table stripes ────────────────────────────────────────── */
+.dark .bg-muted\/50 {
+  background-color: rgba(30, 48, 31, 0.5) !important;
+}
+
+/* ── Shadow softening in dark mode ───────────────────────── */
+.dark .shadow-sm,
+.dark .shadow,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl,
+.dark .shadow-2xl {
+  --tw-shadow-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+

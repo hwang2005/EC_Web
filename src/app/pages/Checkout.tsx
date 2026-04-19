@@ -75,7 +75,7 @@ export function Checkout() {
 
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryOption>(DELIVERY_OPTIONS[0]);
   const [selectedPayment, setSelectedPayment] = useState(PAYMENT_METHODS[0].id);
-  const [selectedSlot, setSelectedSlot] = useState(DELIVERY_SLOTS[1].id); // Default: morning
+  const [selectedSlot, setSelectedSlot] = useState(DELIVERY_SLOTS[0].id); // Default: morning
   const [deliveryNote, setDeliveryNote] = useState("");
   const [substitutionPref, setSubstitutionPref] = useState("no-sub");
   
@@ -507,13 +507,6 @@ export function Checkout() {
                   </div>
                 </div>
 
-                {/* Ghi chú: Theo Nghị quyết 202/2025/QH15 */}
-                <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-xs text-amber-800 flex items-center gap-1">
-                    <Info className="w-3.5 h-3.5 flex-shrink-0" />
-                    Địa giới hành chính theo Nghị quyết 202/2025/QH15 (mô hình 2 cấp: Tỉnh/TP → Phường/Xã, có hiệu lực từ 01/07/2025).
-                  </p>
-                </div>
 
                 <div>
                   <label className="block text-sm font-semibold mb-1">
@@ -561,7 +554,7 @@ export function Checkout() {
                     <div>
                       <p className="font-semibold text-orange-900 text-sm">⚠️ Giỏ hàng có sản phẩm tươi sống</p>
                       <p className="text-sm text-orange-700 mt-1">
-                        Đơn hàng của bạn có sản phẩm dễ hỏng. Chúng tôi khuyến nghị chọn <strong>Giao Hàng Nhanh</strong> hoặc <strong>Giao Trong Ngày</strong> và khung giờ <strong>Sáng sớm</strong> để đảm bảo độ tươi.
+                        Đơn hàng của bạn có sản phẩm dễ hỏng. Chúng tôi khuyến nghị chọn <strong>Giao Hàng Nhanh</strong> hoặc <strong>Giao Trong Ngày</strong> và khung giờ <strong>Buổi sáng</strong> để đảm bảo độ tươi.
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {cart.filter(item => item.product.isPerishable).map(item => (
@@ -625,7 +618,7 @@ export function Checkout() {
                   <h3 className="font-bold text-lg">Chọn khung giờ nhận hàng</h3>
                 </div>
                 <p className="text-sm text-gray-600 mb-4">
-                  Chọn khung giờ mong muốn nhận hàng. Với sản phẩm tươi sống, chúng tôi khuyến nghị nhận hàng vào buổi sáng sớm.
+                  Chọn khung giờ mong muốn nhận hàng. Với sản phẩm tươi sống, chúng tôi khuyến nghị nhận hàng vào buổi sáng.
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {DELIVERY_SLOTS.map((slot) => (
@@ -648,7 +641,7 @@ export function Checkout() {
                       <span className="text-2xl block mb-2">{slot.icon}</span>
                       <p className="font-semibold text-sm">{slot.label}</p>
                       <p className="text-xs text-gray-500 mt-1">{slot.timeRange}</p>
-                      {slot.id === "early-morning" && hasPerishableItems && (
+                      {slot.id === "morning" && hasPerishableItems && (
                         <span className="inline-block mt-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Khuyến nghị</span>
                       )}
                     </label>
@@ -880,7 +873,7 @@ export function Checkout() {
                 </div>
               )}
 
-              {selectedPayment !== "card" && (
+              {selectedPayment !== "card" && selectedPayment !== "cod" && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                   <p className="text-sm text-blue-900">
                     Bạn sẽ được chuyển hướng để hoàn tất thanh toán sau khi đặt hàng.

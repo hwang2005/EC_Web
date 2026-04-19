@@ -1,6 +1,21 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { Product, CartItem, Order, Review, StoreProfile, Voucher } from "../types";
-import { PRODUCTS, CustomerTier, DEFAULT_VOUCHERS } from "../data/products";
+import {
+  Product,
+  CartItem,
+  Order,
+  Review,
+  StoreProfile,
+  Voucher,
+  SubscriptionOrder,
+  SubscriptionDelivery,
+} from "../types";
+import {
+  PRODUCTS,
+  CustomerTier,
+  DEFAULT_VOUCHERS,
+  DELIVERY_OPTIONS,
+  DELIVERY_SLOTS,
+} from "../data/products";
 
 interface ShopContextType {
   products: Product[];
@@ -28,39 +43,267 @@ interface ShopContextType {
   isInWishlist: (productId: string) => boolean;
   addReview: (review: Review) => void;
   getProductReviews: (productId: string) => Review[];
-  // Seller-scoped helpers
   getSellerProducts: (sellerEmail: string) => Product[];
   getSellerOrders: (sellerEmail: string) => Order[];
   getSellerReviews: (sellerEmail: string) => Review[];
-  // Store profile
   storeProfile: StoreProfile;
   updateStoreProfile: (profile: StoreProfile) => void;
-  // Vouchers
   vouchers: Voucher[];
-  validateVoucher: (code: string, subtotal: number, cartCategories: string[]) => { valid: boolean; voucher?: Voucher; error?: string };
+  validateVoucher: (
+    code: string,
+    subtotal: number,
+    cartCategories: string[],
+  ) => { valid: boolean; voucher?: Voucher; error?: string };
   applyVoucher: (voucherId: string) => void;
   addVoucher: (voucher: Voucher) => void;
   updateVoucher: (voucher: Voucher) => void;
   deleteVoucher: (voucherId: string) => void;
+  subscriptions: SubscriptionOrder[];
+  createSubscription: (sub: SubscriptionOrder) => void;
+  updateSubscription: (sub: SubscriptionOrder) => void;
+  pauseSubscription: (subId: string) => void;
+  resumeSubscription: (subId: string) => void;
+  cancelSubscription: (subId: string) => void;
+  getActiveSubscription: () => SubscriptionOrder | undefined;
 }
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
 
 const DEFAULT_STORE_PROFILE: StoreProfile = {
-  shopName: "Nông Sản Việt",
-  shopDescription: "Chuyên cung cấp nông sản sạch, chất lượng cao từ khắp các vùng miền Việt Nam.",
-  shopAddress: "123 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh",
+  shopName: "NÃ´ng Sáº£n Viá»‡t",
+  shopDescription:
+    "ChuyÃªn cung cáº¥p nÃ´ng sáº£n sáº¡ch, cháº¥t lÆ°á»£ng cao tá»« kháº¯p cÃ¡c vÃ¹ng miá»n Viá»‡t Nam.",
+  shopAddress: "123 Nguyá»…n Huá»‡, Quáº­n 1, TP. Há»“ ChÃ­ Minh",
   shopPhone: "0912 345 678",
   shopEmail: "seller@demo.com",
 };
+
+const DAY_MAP: Record<string, number> = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+};
+
+const DEFAULT_SUBSCRIPTION_DELIVERY = DELIVERY_OPTIONS[0];
+
+function formatCycleKey(dateInput: string | Date): string {
+  const date = new Date(dateInput);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getFirstPreferredDayAfter(reference: Date, preferredDay: string, minDaysAhead: number): Date {
+  const targetDay = DAY_MAP[preferredDay] ?? DAY_MAP.wednesday;
+  const base = new Date(reference);
+  base.setHours(9, 0, 0, 0);
+  base.setDate(base.getDate() + minDaysAhead);
+
+  const diff = (targetDay - base.getDay() + 7) % 7;
+  base.setDate(base.getDate() + diff);
+  return base;
+}
+
+function getInitialSubscriptionDate(
+  frequency: SubscriptionOrder["frequency"],
+  preferredDay: string,
+): Date {
+  const now = new Date();
+  if (frequency === "monthly") {
+    return getFirstPreferredDayAfter(now, preferredDay, 1);
+  }
+  return getFirstPreferredDayAfter(now, preferredDay, 1);
+}
+
+function getNextSubscriptionDateFrom(
+  fromDate: string | Date,
+  frequency: SubscriptionOrder["frequency"],
+  preferredDay: string,
+): Date {
+  const current = new Date(fromDate);
+  current.setHours(9, 0, 0, 0);
+
+  if (frequency === "weekly") {
+    return getFirstPreferredDayAfter(current, preferredDay, 7);
+  }
+
+  if (frequency === "biweekly") {
+    return getFirstPreferredDayAfter(current, preferredDay, 14);
+  }
+
+  const nextMonthAnchor = new Date(current);
+  nextMonthAnchor.setMonth(nextMonthAnchor.getMonth() + 1);
+  return getFirstPreferredDayAfter(nextMonthAnchor, preferredDay, 0);
+}
+
+function parseEstimatedDeliveryDays(estimatedDays: string): number {
+  const match = estimatedDays.match(/\d+/);
+  return match ? Number(match[0]) : 3;
+}
+
+function getSubscriptionOrders(orders: Order[], subscriptionId: string): Order[] {
+  return orders.filter((order) => order.subscriptionId === subscriptionId);
+}
+
+function buildSubscriptionDeliveryHistory(
+  subscription: SubscriptionOrder,
+  orders: Order[],
+): SubscriptionDelivery[] {
+  const relatedOrders = getSubscriptionOrders(orders, subscription.id);
+  const orderCycleKeys = new Set(
+    relatedOrders
+      .map((order) => order.subscriptionCycleKey)
+      .filter((value): value is string => Boolean(value)),
+  );
+
+  const orderHistory = relatedOrders.map((order) => {
+    const deliveryDate = order.subscriptionCycleKey
+      ? `${order.subscriptionCycleKey}T09:00:00.000`
+      : order.estimatedDelivery;
+
+    let status: SubscriptionDelivery["status"] = "scheduled";
+    if (order.status === "delivered") {
+      status = "delivered";
+    } else if (order.status === "cancelled") {
+      status = "skipped";
+    }
+
+    return {
+      id: order.id,
+      deliveryDate,
+      status,
+      total: order.total,
+      items: order.items.map((item) => ({
+        productId: item.product.id,
+        productName: item.product.name,
+        quantity: item.quantity,
+        price: item.product.price,
+      })),
+    };
+  });
+
+  const skippedHistory = subscription.deliveryHistory.filter(
+    (delivery) =>
+      delivery.status === "skipped" &&
+      !orderCycleKeys.has(formatCycleKey(delivery.deliveryDate)),
+  );
+
+  return [...orderHistory, ...skippedHistory].sort(
+    (a, b) =>
+      new Date(b.deliveryDate).getTime() - new Date(a.deliveryDate).getTime(),
+  );
+}
+
+function appendSkippedDelivery(
+  subscription: SubscriptionOrder,
+  cycleDate: Date,
+): SubscriptionOrder {
+  const cycleKey = formatCycleKey(cycleDate);
+  const existingSkipped = subscription.deliveryHistory.some(
+    (delivery) =>
+      delivery.status === "skipped" &&
+      formatCycleKey(delivery.deliveryDate) === cycleKey,
+  );
+
+  if (existingSkipped) {
+    return subscription;
+  }
+
+  return {
+    ...subscription,
+    deliveryHistory: [
+      ...subscription.deliveryHistory,
+      {
+        id: `skip-${cycleKey}`,
+        deliveryDate: cycleDate.toISOString(),
+        status: "skipped",
+        total: 0,
+        items: [],
+      },
+    ],
+  };
+}
+
+function buildSubscriptionOrderForCycle(
+  subscription: SubscriptionOrder,
+  cycleDate: Date,
+  products: Product[],
+): Order | null {
+  const availableItems: CartItem[] = [];
+  const unavailableNames: string[] = [];
+
+  subscription.selectedProducts.forEach((productId) => {
+    const product = products.find((item) => item.id === productId);
+    if (product && product.stock > 0) {
+      availableItems.push({ product, quantity: 1 });
+    } else {
+      unavailableNames.push(product?.name || `SP ${productId}`);
+    }
+  });
+
+  if (availableItems.length === 0) {
+    return null;
+  }
+
+  const subtotal = availableItems.reduce(
+    (sum, item) => sum + item.product.price * item.quantity,
+    0,
+  );
+  const tax = subtotal * 0.1;
+  const total = subtotal + tax + DEFAULT_SUBSCRIPTION_DELIVERY.price;
+
+  const deliveryNote = [
+    subscription.deliveryNote?.trim(),
+    subscription.substitutionPref.includes("Gá»i")
+      ? unavailableNames.length > 0
+        ? `Thiáº¿u hÃ ng: ${unavailableNames.join(", ")}; vui lÃ²ng liÃªn há»‡ khÃ¡ch trÆ°á»›c khi thay tháº¿`
+        : undefined
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+
+  const estimatedDelivery = new Date(cycleDate);
+  estimatedDelivery.setDate(
+    estimatedDelivery.getDate() +
+      parseEstimatedDeliveryDays(DEFAULT_SUBSCRIPTION_DELIVERY.estimatedDays),
+  );
+
+  const slot = DELIVERY_SLOTS.find((item) => item.id === subscription.preferredSlot);
+  const cycleKey = formatCycleKey(cycleDate);
+
+  return {
+    id: `SUB-ORD-${Date.now()}-${cycleKey}`,
+    items: availableItems,
+    total,
+    status: "processing",
+    deliveryOption: DEFAULT_SUBSCRIPTION_DELIVERY,
+    shippingAddress: subscription.shippingAddress,
+    paymentMethod: subscription.paymentMethod,
+    orderDate: new Date().toISOString(),
+    estimatedDelivery: estimatedDelivery.toISOString(),
+    buyerEmail: subscription.buyerEmail,
+    deliverySlot: slot ? `${slot.label} (${slot.timeRange})` : subscription.preferredSlot,
+    deliveryNote: deliveryNote || undefined,
+    substitutionPref: subscription.substitutionPref,
+    isSubscriptionOrder: true,
+    subscriptionId: subscription.id,
+    subscriptionPlanId: subscription.planId,
+    subscriptionPlanName: subscription.planName,
+    subscriptionCycleKey: cycleKey,
+  };
+}
 
 export function ShopProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<Product[]>(() => {
     const stored = localStorage.getItem("products");
     if (stored) {
       const storedProducts: Product[] = JSON.parse(stored);
-      // Always use latest data from source for built-in products,
-      // but keep any admin-added products (IDs not in PRODUCTS)
       const sourceIds = new Set(PRODUCTS.map((p) => p.id));
       const adminProducts = storedProducts.filter((p) => !sourceIds.has(p.id));
       return [...PRODUCTS, ...adminProducts];
@@ -93,7 +336,6 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     return (stored as CustomerTier) || "standard";
   });
 
-  // ── Auto-compute tier from total delivered-order spending ──
   const computeAutoTier = (ordersList: Order[]): CustomerTier => {
     const totalSpent = ordersList
       .filter((o) => o.status === "delivered")
@@ -115,7 +357,6 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem("vouchers");
     if (stored) {
       const parsed: Voucher[] = JSON.parse(stored);
-      // Merge: keep stored ones, add any DEFAULT_VOUCHERS not yet present
       const storedIds = new Set(parsed.map((v) => v.id));
       const newDefaults = DEFAULT_VOUCHERS.filter((v) => !storedIds.has(v.id));
       return [...parsed, ...newDefaults];
@@ -123,7 +364,11 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     return DEFAULT_VOUCHERS;
   });
 
-  // Persist to localStorage
+  const [subscriptions, setSubscriptions] = useState<SubscriptionOrder[]>(() => {
+    const stored = localStorage.getItem("subscriptions");
+    return stored ? JSON.parse(stored) : [];
+  });
+
   useEffect(() => {
     localStorage.setItem("products", JSON.stringify(products));
   }, [products]);
@@ -148,26 +393,104 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("customerTier", customerTier);
   }, [customerTier]);
 
-  // Sync manual tier with auto-computed tier whenever orders change
   useEffect(() => {
     if (autoTier !== customerTier) {
       setCustomerTier(autoTier);
     }
-  }, [autoTier]);
+  }, [autoTier, customerTier]);
 
   useEffect(() => {
     localStorage.setItem("storeProfile", JSON.stringify(storeProfile));
   }, [storeProfile]);
 
   useEffect(() => {
+    localStorage.setItem("subscriptions", JSON.stringify(subscriptions));
+  }, [subscriptions]);
+
+  useEffect(() => {
     localStorage.setItem("vouchers", JSON.stringify(vouchers));
   }, [vouchers]);
+
+  useEffect(() => {
+    const now = new Date();
+    let nextOrders = orders;
+
+    const nextSubscriptions = subscriptions.map((subscription) => {
+      let workingSubscription = { ...subscription };
+
+      if (workingSubscription.status === "active") {
+        let nextDate = new Date(workingSubscription.nextDeliveryDate);
+        nextDate.setHours(9, 0, 0, 0);
+
+        while (nextDate.getTime() <= now.getTime()) {
+          const cycleKey = formatCycleKey(nextDate);
+          const alreadyHasOrder = nextOrders.some(
+            (order) =>
+              order.subscriptionId === workingSubscription.id &&
+              order.subscriptionCycleKey === cycleKey,
+          );
+          const alreadySkipped = workingSubscription.deliveryHistory.some(
+            (delivery) =>
+              delivery.status === "skipped" &&
+              formatCycleKey(delivery.deliveryDate) === cycleKey,
+          );
+
+          if (!alreadyHasOrder && !alreadySkipped) {
+            const nextOrder = buildSubscriptionOrderForCycle(
+              workingSubscription,
+              nextDate,
+              products,
+            );
+
+            if (nextOrder) {
+              nextOrders = [nextOrder, ...nextOrders];
+            } else {
+              workingSubscription = appendSkippedDelivery(
+                workingSubscription,
+                nextDate,
+              );
+            }
+          }
+
+          nextDate = getNextSubscriptionDateFrom(
+            nextDate,
+            workingSubscription.frequency,
+            workingSubscription.preferredDay,
+          );
+        }
+
+        workingSubscription.nextDeliveryDate = nextDate.toISOString();
+      }
+
+      const syncedHistory = buildSubscriptionDeliveryHistory(
+        workingSubscription,
+        nextOrders,
+      );
+      const lastDelivered = syncedHistory.find(
+        (delivery) => delivery.status === "delivered",
+      );
+
+      return {
+        ...workingSubscription,
+        deliveryHistory: syncedHistory,
+        lastDeliveryDate: lastDelivered?.deliveryDate,
+      };
+    });
+
+    if (JSON.stringify(nextOrders) !== JSON.stringify(orders)) {
+      setOrders(nextOrders);
+    }
+
+    if (JSON.stringify(nextSubscriptions) !== JSON.stringify(subscriptions)) {
+      setSubscriptions(nextSubscriptions);
+    }
+  }, [orders, products, subscriptions]);
 
   const getPersonalizedPrice = (price: number) => {
     const discounts = {
       standard: 0,
       silver: 0.05,
-      gold: 0.10,
+      gold: 0.1,
       platinum: 0.15,
     };
     return price * (1 - discounts[customerTier]);
@@ -180,7 +503,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         return prev.map((item) =>
           item.product.id === product.id
             ? { ...item, quantity: item.quantity + quantity }
-            : item
+            : item,
         );
       }
       return [...prev, { product, quantity }];
@@ -198,8 +521,8 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     }
     setCart((prev) =>
       prev.map((item) =>
-        item.product.id === productId ? { ...item, quantity } : item
-      )
+        item.product.id === productId ? { ...item, quantity } : item,
+      ),
     );
   };
 
@@ -212,7 +535,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     clearCart();
   };
 
-  const CANCEL_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+  const CANCEL_WINDOW_MS = 5 * 60 * 1000;
 
   const cancelOrder = (orderId: string): boolean => {
     const order = orders.find((o) => o.id === orderId);
@@ -221,20 +544,19 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     const elapsed = Date.now() - new Date(order.orderDate).getTime();
     if (elapsed > CANCEL_WINDOW_MS) return false;
 
-    // Only allow cancellation if order hasn't progressed past processing
     if (order.status !== "pending" && order.status !== "processing") return false;
 
     setOrders((prev) =>
       prev.map((o) =>
-        o.id === orderId ? { ...o, status: "cancelled" as const } : o
-      )
+        o.id === orderId ? { ...o, status: "cancelled" as const } : o,
+      ),
     );
     return true;
   };
 
   const updateOrderStatus = (orderId: string, status: Order["status"]) => {
     setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status } : o))
+      prev.map((o) => (o.id === orderId ? { ...o, status } : o)),
     );
   };
 
@@ -243,9 +565,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateProduct = (product: Product) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === product.id ? product : p))
-    );
+    setProducts((prev) => prev.map((p) => (p.id === product.id ? product : p)));
   };
 
   const deleteProduct = (productId: string) => {
@@ -253,14 +573,16 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   };
 
   const getCartTotal = () => {
-    return cart.reduce((total, item) => total + item.product.price * item.quantity, 0);
+    return cart.reduce(
+      (total, item) => total + item.product.price * item.quantity,
+      0,
+    );
   };
 
   const getCartCount = () => {
     return cart.reduce((count, item) => count + item.quantity, 0);
   };
 
-  // Wishlist methods
   const addToWishlist = (product: Product) => {
     setWishlist((prev) => {
       if (prev.some((p) => p.id === product.id)) return prev;
@@ -276,7 +598,6 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     return wishlist.some((p) => p.id === productId);
   };
 
-  // Review methods
   const addReview = (review: Review) => {
     setReviews((prev) => [review, ...prev]);
   };
@@ -285,27 +606,21 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     return reviews.filter((r) => r.productId === productId);
   };
 
-  // Seller-scoped helpers
   const getSellerProducts = (sellerEmail: string) => {
     return products.filter(
-      (p) => p.sellerId?.toLowerCase() === sellerEmail.toLowerCase()
+      (p) => p.sellerId?.toLowerCase() === sellerEmail.toLowerCase(),
     );
   };
 
   const getSellerOrders = (sellerEmail: string) => {
-    // An order belongs to a seller if any item in the order is from that seller's products
-    const sellerProductIds = new Set(
-      getSellerProducts(sellerEmail).map((p) => p.id)
-    );
+    const sellerProductIds = new Set(getSellerProducts(sellerEmail).map((p) => p.id));
     return orders.filter((order) =>
-      order.items.some((item) => sellerProductIds.has(item.product.id))
+      order.items.some((item) => sellerProductIds.has(item.product.id)),
     );
   };
 
   const getSellerReviews = (sellerEmail: string) => {
-    const sellerProductIds = new Set(
-      getSellerProducts(sellerEmail).map((p) => p.id)
-    );
+    const sellerProductIds = new Set(getSellerProducts(sellerEmail).map((p) => p.id));
     return reviews.filter((r) => sellerProductIds.has(r.productId));
   };
 
@@ -313,60 +628,58 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     setStoreProfile(profile);
   };
 
-  // ── Voucher management ──────────────────────────────────────────────────────
-  /**
-   * Validate a voucher code against the current user tier, cart subtotal,
-   * and the list of product categories in the cart.
-   */
   const validateVoucher = (
     code: string,
     subtotal: number,
-    cartCategories: string[]
+    cartCategories: string[],
   ): { valid: boolean; voucher?: Voucher; error?: string } => {
     const voucher = vouchers.find(
-      (v) => v.code.toUpperCase() === code.toUpperCase()
+      (v) => v.code.toUpperCase() === code.toUpperCase(),
     );
-    if (!voucher) return { valid: false, error: "Mã voucher không tồn tại." };
-    if (!voucher.isActive) return { valid: false, error: "Voucher này đã bị vô hiệu hóa." };
+    if (!voucher) return { valid: false, error: "MÃ£ voucher khÃ´ng tá»“n táº¡i." };
+    if (!voucher.isActive) {
+      return { valid: false, error: "Voucher nÃ y Ä‘Ã£ bá»‹ vÃ´ hiá»‡u hÃ³a." };
+    }
 
-    // Expiry check
     if (new Date(voucher.expiryDate) < new Date()) {
-      return { valid: false, error: "Voucher đã hết hạn." };
+      return { valid: false, error: "Voucher Ä‘Ã£ háº¿t háº¡n." };
     }
 
-    // Usage limit check
-    if (voucher.usageLimit !== undefined && voucher.usedCount >= voucher.usageLimit) {
-      return { valid: false, error: "Voucher đã đạt giới hạn sử dụng." };
-    }
-
-    // Minimum order value check
-    if (subtotal < voucher.minOrderValue) {
+    if (
+      voucher.usageLimit !== undefined &&
+      voucher.usedCount >= voucher.usageLimit
+    ) {
       return {
         valid: false,
-        error: `Đơn hàng tối thiểu ${voucher.minOrderValue.toLocaleString("vi-VN")}₫ để áp dụng voucher này.`,
+        error: "Voucher Ä‘Ã£ Ä‘áº¡t giá»›i háº¡n sá»­ dá»¥ng.",
       };
     }
 
-    // Rank check
+    if (subtotal < voucher.minOrderValue) {
+      return {
+        valid: false,
+        error: `ÄÆ¡n hÃ ng tá»‘i thiá»ƒu ${voucher.minOrderValue.toLocaleString("vi-VN")}â‚« Ä‘á»ƒ Ã¡p dá»¥ng voucher nÃ y.`,
+      };
+    }
+
     if (
       !voucher.applicableRanks.includes("all") &&
       !voucher.applicableRanks.includes(autoTier)
     ) {
       return {
         valid: false,
-        error: `Voucher này chỉ dành cho hạng thành viên: ${voucher.applicableRanks.join(", ")}.`,
+        error: `Voucher nÃ y chá»‰ dÃ nh cho háº¡ng thÃ nh viÃªn: ${voucher.applicableRanks.join(", ")}.`,
       };
     }
 
-    // Category check: at least one cart item must match the required category
     if (!voucher.applicableCategories.includes("all")) {
       const hasMatchingCategory = cartCategories.some((cat) =>
-        voucher.applicableCategories.includes(cat)
+        voucher.applicableCategories.includes(cat),
       );
       if (!hasMatchingCategory) {
         return {
           valid: false,
-          error: `Voucher này chỉ áp dụng cho danh mục: ${voucher.applicableCategories.join(", ")}.`,
+          error: `Voucher nÃ y chá»‰ Ã¡p dá»¥ng cho danh má»¥c: ${voucher.applicableCategories.join(", ")}.`,
         };
       }
     }
@@ -374,14 +687,11 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     return { valid: true, voucher };
   };
 
-  /**
-   * Increment usedCount for a voucher after a successful order.
-   */
   const applyVoucher = (voucherId: string) => {
     setVouchers((prev) =>
       prev.map((v) =>
-        v.id === voucherId ? { ...v, usedCount: v.usedCount + 1 } : v
-      )
+        v.id === voucherId ? { ...v, usedCount: v.usedCount + 1 } : v,
+      ),
     );
   };
 
@@ -396,7 +706,68 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   const deleteVoucher = (voucherId: string) => {
     setVouchers((prev) => prev.filter((v) => v.id !== voucherId));
   };
-  // ────────────────────────────────────────────────────────────────────────────
+
+  const createSubscription = (sub: SubscriptionOrder) => {
+    setSubscriptions((prev) => [
+      {
+        ...sub,
+        deliveryHistory: buildSubscriptionDeliveryHistory(sub, orders),
+      },
+      ...prev.filter((item) => item.buyerEmail !== sub.buyerEmail || item.status === "cancelled"),
+    ]);
+  };
+
+  const updateSubscription = (sub: SubscriptionOrder) => {
+    setSubscriptions((prev) => prev.map((s) => (s.id === sub.id ? sub : s)));
+  };
+
+  const pauseSubscription = (subId: string) => {
+    setSubscriptions((prev) =>
+      prev.map((s) =>
+        s.id === subId
+          ? { ...s, status: "paused" as const, pausedDate: new Date().toISOString() }
+          : s,
+      ),
+    );
+  };
+
+  const resumeSubscription = (subId: string) => {
+    setSubscriptions((prev) =>
+      prev.map((s) => {
+        if (s.id !== subId) return s;
+        return {
+          ...s,
+          status: "active" as const,
+          pausedDate: undefined,
+          nextDeliveryDate: getInitialSubscriptionDate(
+            s.frequency,
+            s.preferredDay,
+          ).toISOString(),
+        };
+      }),
+    );
+  };
+
+  const cancelSubscription = (subId: string) => {
+    setSubscriptions((prev) =>
+      prev.map((s) =>
+        s.id === subId
+          ? {
+              ...s,
+              status: "cancelled" as const,
+              cancelledDate: new Date().toISOString(),
+            }
+          : s,
+      ),
+    );
+  };
+
+  const getActiveSubscription = (): SubscriptionOrder | undefined => {
+    const email = localStorage.getItem("current_user_email") || "";
+    return subscriptions.find(
+      (s) => s.buyerEmail === email && s.status !== "cancelled",
+    );
+  };
 
   return (
     <ShopContext.Provider
@@ -437,6 +808,13 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         addVoucher,
         updateVoucher,
         deleteVoucher,
+        subscriptions,
+        createSubscription,
+        updateSubscription,
+        pauseSubscription,
+        resumeSubscription,
+        cancelSubscription,
+        getActiveSubscription,
       }}
     >
       {children}

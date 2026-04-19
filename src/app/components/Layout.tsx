@@ -1,6 +1,7 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { useState, useRef, useEffect } from "react";
-import { ShoppingCart, Package, Home, Grid3x3, Sprout, BarChart3, LogOut, Heart, UserCircle, Phone, TreePine, CalendarDays, Crown, AlertTriangle, ChevronDown, Menu, X } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { ShoppingCart, Package, Home, Grid3x3, Sprout, BarChart3, LogOut, Heart, UserCircle, Phone, TreePine, CalendarDays, Crown, AlertTriangle, ChevronDown, Menu, X, ShieldAlert, Sun, Moon } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
 import { Chatbot } from "./Chatbot";
@@ -8,12 +9,14 @@ import { Chatbot } from "./Chatbot";
 export function Layout() {
   const { getCartCount, wishlist, products, orders } = useShop();
   const { role, logout } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const cartCount = getCartCount();
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
@@ -37,6 +40,23 @@ export function Layout() {
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // Logout confirmation helpers
+  const requestLogout = useCallback(() => {
+    setUserMenuOpen(false);
+    setMobileMenuOpen(false);
+    setLogoutModalOpen(true);
+  }, []);
+
+  const confirmLogout = useCallback(() => {
+    setLogoutModalOpen(false);
+    logout();
+    navigate("/");
+  }, [logout, navigate]);
+
+  const cancelLogout = useCallback(() => {
+    setLogoutModalOpen(false);
   }, []);
 
 
@@ -74,7 +94,7 @@ export function Layout() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-50 border-b border-border">
+      <header className="bg-background/95 backdrop-blur-md shadow-sm sticky top-0 z-50 border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
@@ -138,6 +158,20 @@ export function Layout() {
             {/* Desktop: Cart + User Dropdown */}
             <div className="hidden lg:flex items-center gap-2">
 
+              {/* Dark / Light toggle */}
+              <button
+                onClick={toggleTheme}
+                aria-label={isDark ? "Chuyển sang chế độ sáng" : "Chuyển sang chế độ tối"}
+                className="relative p-2 rounded-lg transition-all duration-300 text-foreground/70 hover:text-primary hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                <span className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ${isDark ? "opacity-100 rotate-0" : "opacity-0 rotate-90"}`}>
+                  <Sun className="w-5 h-5 text-yellow-400" />
+                </span>
+                <span className={`flex items-center justify-center transition-all duration-300 ${isDark ? "opacity-0 -rotate-90" : "opacity-100 rotate-0"}`}>
+                  <Moon className="w-5 h-5" />
+                </span>
+              </button>
+
               {/* Cart */}
               {isCustomer && (
                 <Link
@@ -174,7 +208,7 @@ export function Layout() {
 
                   {/* Dropdown Menu */}
                   {userMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-border/50 py-2 z-[60] animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="absolute right-0 mt-2 w-56 bg-card rounded-xl shadow-xl border border-border/50 py-2 z-[60] animate-in fade-in slide-in-from-top-2 duration-200">
                       {/* User info header */}
                       <div className="px-4 py-3 border-b border-border/50">
                         <p className="text-sm font-semibold text-foreground">{isSeller ? "Người Bán" : "Khách Hàng"}</p>
@@ -219,10 +253,7 @@ export function Layout() {
                       {/* Divider + Logout */}
                       <div className="border-t border-border/50 mt-1 pt-1">
                         <button
-                          onClick={() => {
-                            logout();
-                            navigate("/");
-                          }}
+                          onClick={requestLogout}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-destructive hover:bg-destructive/5 transition-colors"
                         >
                           <LogOut className="w-4 h-4" />
@@ -243,12 +274,12 @@ export function Layout() {
               )}
             </div>
 
-            {/* Mobile: Cart + Hamburger */}
+            {/* Mobile: Cart + Dark Toggle + Hamburger */}
             <div className="flex lg:hidden items-center gap-2">
               {isCustomer && (
                 <Link
                   to="/cart"
-                  className="relative flex items-center gap-1 px-3 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                  className="relative flex items-center gap-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   <ShoppingCart className="w-5 h-5" />
                   {cartCount > 0 && (
@@ -258,6 +289,14 @@ export function Layout() {
                   )}
                 </Link>
               )}
+              {/* Mobile dark/light toggle */}
+              <button
+                onClick={toggleTheme}
+                aria-label={isDark ? "Chuyển sang chế độ sáng" : "Chuyển sang chế độ tối"}
+                className="relative p-2 rounded-lg transition-all duration-300 text-foreground/70 hover:text-primary hover:bg-primary/10"
+              >
+                {isDark ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5" />}
+              </button>
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="p-2 rounded-lg text-foreground/80 hover:bg-muted transition-colors"
@@ -271,7 +310,7 @@ export function Layout() {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div ref={mobileMenuRef} className="lg:hidden border-t border-border bg-white/98 backdrop-blur-md shadow-lg">
+          <div ref={mobileMenuRef} className="lg:hidden border-t border-border bg-background/98 backdrop-blur-md shadow-lg">
             <div className="max-w-7xl mx-auto px-4 py-4 space-y-1">
 
 
@@ -369,10 +408,7 @@ export function Layout() {
               {role ? (
                 <div className="border-t border-border/50 mt-2 pt-2">
                   <button
-                    onClick={() => {
-                      logout();
-                      navigate("/");
-                    }}
+                    onClick={requestLogout}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/5 transition-colors"
                   >
                     <LogOut className="w-5 h-5" />
@@ -403,54 +439,98 @@ export function Layout() {
       {/* Chatbot */}
       <Chatbot />
 
-      {/* Footer */}
-      <footer className="bg-foreground text-white mt-16">
+      {/* Footer — always dark regardless of theme */}
+      <footer className="mt-16" style={{ backgroundColor: "#1a2e1c", color: "#f0f7f0" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <Sprout className="w-6 h-6" />
-                <span className="font-bold">Nông Sản Việt</span>
+                <Sprout className="w-6 h-6 text-[#8fbc5a]" />
+                <span className="font-bold text-white">Nông Sản Việt</span>
               </div>
-              <p className="text-gray-400 text-sm">
+              <p className="text-[#a8c8a8] text-sm leading-relaxed">
                 Nền tảng thương mại điện tử nông sản Việt Nam. Kết nối người nông dân với người tiêu dùng.
               </p>
             </div>
             <div>
-              <h3 className="font-semibold mb-4">Mua Sắm</h3>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><Link to="/products" className="hover:text-white">Tất Cả Sản Phẩm</Link></li>
-                {isCustomer && <li><Link to="/cart" className="hover:text-white">Giỏ Hàng</Link></li>}
-                {isCustomer && <li><Link to="/wishlist" className="hover:text-white">Sản Phẩm Yêu Thích</Link></li>}
-                {isCustomer && <li><Link to="/orders" className="hover:text-white">Lịch Sử Đơn Hàng</Link></li>}
+              <h3 className="font-semibold mb-4 text-white">Mua Sắm</h3>
+              <ul className="space-y-2 text-sm text-[#a8c8a8]">
+                <li><Link to="/products" className="hover:text-white transition-colors">Tất Cả Sản Phẩm</Link></li>
+                {isCustomer && <li><Link to="/cart" className="hover:text-white transition-colors">Giỏ Hàng</Link></li>}
+                {isCustomer && <li><Link to="/wishlist" className="hover:text-white transition-colors">Sản Phẩm Yêu Thích</Link></li>}
+                {isCustomer && <li><Link to="/orders" className="hover:text-white transition-colors">Lịch Sử Đơn Hàng</Link></li>}
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold mb-4">Tài Khoản</h3>
-              <ul className="space-y-2 text-sm text-gray-400">
-                {role && <li><Link to="/profile" className="hover:text-white">Tài Khoản Của Tôi</Link></li>}
-                {!role && <li><Link to="/auth" className="hover:text-white">Đăng Nhập / Đăng Ký</Link></li>}
-                <li><Link to="/contact" className="hover:text-white">Liên Hệ</Link></li>
-                <li><Link to="/loyalty" className="hover:text-white">Tích Điểm Thành Viên</Link></li>
-                <li><Link to="/subscription" className="hover:text-white">Gói Định Kỳ</Link></li>
-                <li><Link to="/issue-center" className="hover:text-white">Hỗ Trợ Chất Lượng</Link></li>
+              <h3 className="font-semibold mb-4 text-white">Tài Khoản</h3>
+              <ul className="space-y-2 text-sm text-[#a8c8a8]">
+                {role && <li><Link to="/profile" className="hover:text-white transition-colors">Tài Khoản Của Tôi</Link></li>}
+                {!role && <li><Link to="/auth" className="hover:text-white transition-colors">Đăng Nhập / Đăng Ký</Link></li>}
+                <li><Link to="/contact" className="hover:text-white transition-colors">Liên Hệ</Link></li>
+                <li><Link to="/loyalty" className="hover:text-white transition-colors">Tích Điểm Thành Viên</Link></li>
+                <li><Link to="/subscription" className="hover:text-white transition-colors">Gói Định Kỳ</Link></li>
+                <li><Link to="/issue-center" className="hover:text-white transition-colors">Hỗ Trợ Chất Lượng</Link></li>
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold mb-4">Chính Sách</h3>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-white">Bảo Mật</a></li>
-                <li><a href="#" className="hover:text-white">Điều Khoản Dịch Vụ</a></li>
-                <li><a href="#" className="hover:text-white">Chính Sách Đổi Trả</a></li>
-                <li><a href="#" className="hover:text-white">Thanh Toán An Toàn</a></li>
+              <h3 className="font-semibold mb-4 text-white">Chính Sách</h3>
+              <ul className="space-y-2 text-sm text-[#a8c8a8]">
+                <li><a href="#" className="hover:text-white transition-colors">Bảo Mật</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Điều Khoản Dịch Vụ</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Chính Sách Đổi Trả</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Thanh Toán An Toàn</a></li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
+          <div className="border-t mt-8 pt-8 text-center text-sm text-[#a8c8a8]" style={{ borderColor: "rgba(143, 188, 90, 0.2)" }}>
             <p>&copy; 2026 Nông Sản Việt. Tất cả các quyền được bảo lưu. Phiên bản demo.</p>
           </div>
         </div>
       </footer>
+
+      {/* ── Logout Confirmation Modal ───────────────────────────────────────── */}
+      {logoutModalOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          onClick={cancelLogout}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" />
+
+          {/* Dialog */}
+          <div
+            className="relative bg-card rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 slide-in-from-bottom-4 duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Icon */}
+            <div className="mx-auto w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+              <ShieldAlert className="w-7 h-7 text-destructive" />
+            </div>
+
+            {/* Text */}
+            <h3 className="text-lg font-bold text-foreground text-center">Xác nhận đăng xuất</h3>
+            <p className="text-sm text-muted-foreground text-center mt-2 leading-relaxed">
+              Bạn có chắc chắn muốn đăng xuất khỏi tài khoản? Bạn sẽ cần đăng nhập lại để tiếp tục sử dụng.
+            </p>
+
+            {/* Actions */}
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={cancelLogout}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold border border-border text-foreground hover:bg-muted transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={confirmLogout}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold bg-destructive text-white hover:bg-destructive/90 transition-colors shadow-sm"
+              >
+                Đăng Xuất
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

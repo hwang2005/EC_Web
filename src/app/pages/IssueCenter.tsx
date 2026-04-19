@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
 import { AlertTriangle, Camera, CheckCircle, Clock, Send, MessageSquare, Package, RefreshCw, Banknote, Ticket } from "lucide-react";
@@ -35,19 +35,22 @@ export function IssueCenter() {
   const { role } = useAuth();
   const { orders } = useShop();
   const isCustomer = role === "consumer";
+  const [searchParams] = useSearchParams();
+  const prefilledOrderId = searchParams.get("orderId") || "";
 
   const [issues, setIssues] = useState<IssueReport[]>(() => {
     const stored = localStorage.getItem("issueReports");
     return stored ? JSON.parse(stored) : [];
   });
 
-  // Form state
-  const [selectedOrderId, setSelectedOrderId] = useState("");
+  // Form state — pre-fill from URL param if present
+  const [selectedOrderId, setSelectedOrderId] = useState(prefilledOrderId);
   const [issueType, setIssueType] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [resolution, setResolution] = useState("refund");
-  const [showForm, setShowForm] = useState(false);
+  // Auto-open form when coming from Orders page
+  const [showForm, setShowForm] = useState(!!prefilledOrderId);
 
   // Persist issues
   useEffect(() => {

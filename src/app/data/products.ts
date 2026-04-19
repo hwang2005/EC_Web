@@ -273,10 +273,10 @@ export const DELIVERY_OPTIONS = [
 ];
 
 export const DELIVERY_SLOTS: DeliverySlot[] = [
-  { id: "early-morning", label: "Sáng sớm", timeRange: "6:00 - 8:00", icon: "🌅" },
   { id: "morning", label: "Buổi sáng", timeRange: "8:00 - 12:00", icon: "☀️" },
-  { id: "afternoon", label: "Buổi chiều", timeRange: "12:00 - 17:00", icon: "🌤️" },
-  { id: "evening", label: "Buổi tối", timeRange: "17:00 - 21:00", icon: "🌙" },
+  { id: "noon", label: "Buổi trưa", timeRange: "12:00 - 15:00", icon: "🌤️" },
+  { id: "afternoon", label: "Buổi chiều", timeRange: "15:00 - 18:00", icon: "🌇" },
+  { id: "evening", label: "Buổi tối", timeRange: "18:00 - 21:00", icon: "🌙" },
 ];
 
 export const PAYMENT_METHODS = [

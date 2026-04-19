@@ -64,6 +64,11 @@ export interface Order {
   orderDate: string;
   estimatedDelivery: string;
   buyerEmail: string;
+  isSubscriptionOrder?: boolean;
+  subscriptionId?: string;
+  subscriptionPlanId?: string;
+  subscriptionPlanName?: string;
+  subscriptionCycleKey?: string;
   deliverySlot?: string;     // Khung giờ giao hàng
   deliveryNote?: string;     // Ghi chú giao hàng
   substitutionPref?: string; // Tùy chọn thay thế sản phẩm
@@ -133,4 +138,44 @@ export interface Voucher {
   isActive: boolean;
   usageLimit?: number;                  // Max number of times the voucher can be used
   usedCount: number;                    // How many times it has been used
+}
+
+export interface SubscriptionOrder {
+  id: string;
+  planId: string;                       // e.g. "weekly-veg"
+  planName: string;
+  planIcon: string;
+  frequency: 'weekly' | 'biweekly' | 'monthly';
+  price: number;                        // Price per delivery
+  status: 'active' | 'paused' | 'cancelled';
+  // Delivery scheduling
+  preferredDay: string;                 // e.g. "monday", "wednesday"
+  preferredSlot: string;                // e.g. "morning" (8:00-12:00)
+  // Address
+  shippingAddress: ShippingAddress;
+  // Payment
+  paymentMethod: string;
+  // Product customization
+  selectedProducts: string[];           // Product IDs included in the subscription
+  excludedProducts: string[];           // Product IDs excluded by the user
+  // Dates
+  startDate: string;                    // ISO date
+  nextDeliveryDate: string;             // ISO date
+  lastDeliveryDate?: string;            // ISO date of last delivery
+  pausedDate?: string;                  // ISO date when paused
+  cancelledDate?: string;               // ISO date when cancelled
+  // Delivery history
+  deliveryHistory: SubscriptionDelivery[];
+  // Notes
+  deliveryNote?: string;
+  substitutionPref: string;
+  buyerEmail: string;
+}
+
+export interface SubscriptionDelivery {
+  id: string;
+  deliveryDate: string;                 // ISO date
+  status: 'delivered' | 'scheduled' | 'skipped';
+  total: number;
+  items: { productId: string; productName: string; quantity: number; price: number }[];
 }

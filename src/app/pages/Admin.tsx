@@ -704,6 +704,16 @@ export function Admin() {
                       <div className="flex flex-wrap justify-between items-center gap-4">
                         <div>
                           <p className="font-semibold text-lg text-foreground">{order.id}</p>
+                          {order.isSubscriptionOrder && (
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                              <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                Định kỳ
+                              </span>
+                              {order.subscriptionPlanName && (
+                                <span className="text-xs text-muted-foreground">{order.subscriptionPlanName}</span>
+                              )}
+                            </div>
+                          )}
                           <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                             <span>Đặt lúc {new Date(order.orderDate).toLocaleString("vi-VN")}</span>
                             <span>•</span>

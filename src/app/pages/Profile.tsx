@@ -14,12 +14,17 @@ import {
   Mail,
   Phone,
   User,
+  CalendarDays,
+  Settings2,
+  Crown,
+  ChevronRight,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
 export function Profile() {
   const { role, profile, updateProfile } = useAuth();
-  const { orders, wishlist, customerTier, getCartCount } = useShop();
+  const { orders, wishlist, customerTier, getCartCount, getActiveSubscription } = useShop();
 
   if (!role) {
     return (
@@ -43,6 +48,23 @@ export function Profile() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(profile);
+
+  // Personal preferences (persisted in localStorage)
+  const [defaultSubstitution, setDefaultSubstitution] = useState<string>(
+    () => localStorage.getItem("pref_substitution") || "replace"
+  );
+  const [defaultSlot, setDefaultSlot] = useState<string>(
+    () => localStorage.getItem("pref_slot") || "morning"
+  );
+  const [prefSaved, setPrefSaved] = useState(false);
+
+  const handleSavePreferences = () => {
+    localStorage.setItem("pref_substitution", defaultSubstitution);
+    localStorage.setItem("pref_slot", defaultSlot);
+    setPrefSaved(true);
+    toast.success("Đã lưu tùy chọn cá nhân!");
+    setTimeout(() => setPrefSaved(false), 2500);
+  };
 
   const handleSave = () => {
     if (!formData.name.trim()) {
@@ -247,6 +269,110 @@ export function Profile() {
               </div>
             )}
           </div>
+
+          {/* ─── Personal Preferences (consumer only) ─── */}
+          {role === "consumer" && (
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-border">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <Settings2 className="w-5 h-5 text-primary" />
+                  Tùy Chọn Cá Nhân
+                </h2>
+                <span className="text-xs text-muted-foreground italic">Lưu tự động
+                </span>
+              </div>
+
+              <div className="space-y-5">
+                {/* Default Substitution Rule */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-foreground">
+                    Quy tắc thay thế sản phẩm mặc định
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Khi sản phẩm trong giỏ hết hàng, chúng tôi sẽ…
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {[
+                      { id: "replace", label: "Thay thế tương đương", icon: "🔄" },
+                      { id: "contact", label: "Liên hệ xác nhận", icon: "📞" },
+                      { id: "skip", label: "Không thay thế", icon: "❌" },
+                    ].map((opt) => (
+                      <label
+                        key={opt.id}
+                        className={`flex flex-col items-center gap-1 p-3 border-2 rounded-lg cursor-pointer text-center transition-all ${
+                          defaultSubstitution === opt.id
+                            ? "border-primary bg-primary/5 shadow-sm"
+                            : "border-border hover:border-primary/30"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="substitution"
+                          value={opt.id}
+                          checked={defaultSubstitution === opt.id}
+                          onChange={() => setDefaultSubstitution(opt.id)}
+                          className="sr-only"
+                        />
+                        <span className="text-xl">{opt.icon}</span>
+                        <span className="text-xs font-medium text-foreground leading-tight">{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Default Delivery Slot */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-foreground">
+                    <CalendarDays className="w-4 h-4 inline mr-1 text-primary" />
+                    Khung giờ giao hàng ưa thích
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: "morning", label: "Buổi Sáng", time: "8:00 – 12:00", icon: "🌅" },
+                      { id: "noon", label: "Buổi Trưa", time: "12:00 – 15:00", icon: "☀️" },
+                      { id: "afternoon", label: "Buổi Chiều", time: "15:00 – 18:00", icon: "🌇" },
+                      { id: "evening", label: "Buổi Tối", time: "18:00 – 21:00", icon: "🌙" },
+                    ].map((slot) => (
+                      <label
+                        key={slot.id}
+                        className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                          defaultSlot === slot.id
+                            ? "border-primary bg-primary/5 shadow-sm"
+                            : "border-border hover:border-primary/30"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="slot"
+                          value={slot.id}
+                          checked={defaultSlot === slot.id}
+                          onChange={() => setDefaultSlot(slot.id)}
+                          className="sr-only"
+                        />
+                        <span className="text-lg shrink-0">{slot.icon}</span>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground leading-tight">{slot.label}</p>
+                          <p className="text-xs text-muted-foreground">{slot.time}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSavePreferences}
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+                    prefSaved
+                      ? "bg-green-100 text-green-700"
+                      : "bg-primary text-white hover:bg-primary/90"
+                  }`}
+                >
+                  <Save className="w-4 h-4" />
+                  {prefSaved ? "✓ Đã lưu tùy chọn" : "Lưu Tùy Chọn"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}
@@ -290,6 +416,7 @@ export function Profile() {
                     {orders.length} đơn hàng
                   </p>
                 </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </Link>
               <Link
                 to="/wishlist"
@@ -304,6 +431,7 @@ export function Profile() {
                     {wishlist.length} sản phẩm
                   </p>
                 </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </Link>
               <Link
                 to="/cart"
@@ -318,7 +446,52 @@ export function Profile() {
                     {getCartCount()} sản phẩm
                   </p>
                 </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </Link>
+              {role === "consumer" && (
+                <>
+                  <Link
+                    to="/subscription"
+                    className="flex items-center gap-3 p-4 hover:bg-muted transition-colors"
+                  >
+                    <CalendarDays className="w-5 h-5 text-teal-600" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-foreground text-sm">Gói Định Kỳ</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(() => {
+                          const sub = getActiveSubscription();
+                          if (!sub) return "Chưa đăng ký";
+                          if (sub.status === "paused") return `${sub.planName} — Tạm dừng`;
+                          return `${sub.planName} — Đang hoạt động`;
+                        })()}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </Link>
+                  <Link
+                    to="/loyalty"
+                    className="flex items-center gap-3 p-4 hover:bg-muted transition-colors"
+                  >
+                    <Crown className="w-5 h-5 text-amber-500" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-foreground text-sm">Tích Điểm Thưởng</p>
+                      <p className="text-xs text-muted-foreground">Xem điểm và hạng thành viên</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </Link>
+                  <Link
+                    to="/issue-center"
+                    className="flex items-center gap-3 p-4 hover:bg-muted transition-colors"
+                  >
+                    <AlertTriangle className="w-5 h-5 text-red-500" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-foreground text-sm">Hỗ Trợ Chất Lượng</p>
+                      <p className="text-xs text-muted-foreground">Khiếu nại, đổi / hoàn</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
