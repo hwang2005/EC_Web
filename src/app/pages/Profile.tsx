@@ -76,8 +76,8 @@ export function Profile() {
         arr.findIndex(
           (a) =>
             a.address === addr.address &&
-            a.city === addr.city &&
-            a.zipCode === addr.zipCode
+            a.ward === addr.ward &&
+            a.province === addr.province
         ) === idx
     )
     .slice(0, 3);
@@ -237,7 +237,7 @@ export function Profile() {
                       {addr.address}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {addr.city}, {addr.state} {addr.zipCode}
+                      {addr.ward}, {addr.province}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {addr.phone}

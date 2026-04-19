@@ -319,10 +319,8 @@ export function Orders() {
                     <p>{order.shippingAddress.fullName}</p>
                     <p>{order.shippingAddress.address}</p>
                     <p>
-                      {order.shippingAddress.city}, {order.shippingAddress.state}{" "}
-                      {order.shippingAddress.zipCode}
+                      {order.shippingAddress.ward}, {order.shippingAddress.province}
                     </p>
-                    <p>{order.shippingAddress.country}</p>
                     <p>{order.shippingAddress.phone}</p>
                   </div>
                 </div>

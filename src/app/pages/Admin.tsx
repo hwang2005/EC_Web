@@ -757,7 +757,7 @@ export function Admin() {
                           <div className="text-sm text-foreground space-y-1">
                             <p className="font-medium">{order.shippingAddress.fullName}</p>
                             <p>{order.shippingAddress.address}</p>
-                            <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}</p>
+                            <p>{order.shippingAddress.ward}, {order.shippingAddress.province}</p>
                             <p>{order.shippingAddress.phone}</p>
                             <p className="text-muted-foreground mt-2">
                               {order.deliveryOption.name} • {order.paymentMethod}

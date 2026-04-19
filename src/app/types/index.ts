@@ -48,10 +48,8 @@ export interface PaymentMethod {
 export interface ShippingAddress {
   fullName: string;
   address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  country: string;
+  ward: string;
+  province: string;
   phone: string;
 }
 

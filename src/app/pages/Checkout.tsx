@@ -1,28 +1,77 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
 import { DELIVERY_OPTIONS, PAYMENT_METHODS, DELIVERY_SLOTS } from "../data/products";
+import { fetchProvinces, fetchWardsByProvinceCode, type Province, type Ward } from "../data/vietnam-provinces";
 import { ShippingAddress, DeliveryOption, Order, Voucher } from "../types";
-import { CreditCard, Truck, ShieldCheck, Lock, AlertTriangle, Clock, MessageSquare, RefreshCw, Tag, CheckCircle2, XCircle } from "lucide-react";
+import { CreditCard, Truck, ShieldCheck, Lock, AlertTriangle, Clock, MessageSquare, RefreshCw, Tag, CheckCircle2, XCircle, Info, MapPin } from "lucide-react";
 import { toast } from "sonner";
 
 export function Checkout() {
   const { role } = useAuth();
-  const { cart, getCartTotal, placeOrder, validateVoucher, applyVoucher } = useShop();
+  const { cart, orders, getCartTotal, placeOrder, validateVoucher, applyVoucher } = useShop();
   const navigate = useNavigate();
   
   const [step, setStep] = useState(1); // 1: Shipping, 2: Delivery, 3: Payment
+
+  // ── Province / Ward API state ──
+  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [wards, setWards] = useState<Ward[]>([]);
+  const [loadingProvinces, setLoadingProvinces] = useState(true);
+  const [loadingWards, setLoadingWards] = useState(false);
+  const [selectedProvinceCode, setSelectedProvinceCode] = useState<number | null>(null);
+
+  // Fetch danh sách tỉnh/thành phố khi mount
+  useEffect(() => {
+    fetchProvinces()
+      .then(setProvinces)
+      .catch(() => toast.error("Không thể tải danh sách tỉnh/thành phố"))
+      .finally(() => setLoadingProvinces(false));
+  }, []);
+
+  // Fetch danh sách phường/xã khi chọn tỉnh
+  useEffect(() => {
+    if (selectedProvinceCode === null) {
+      setWards([]);
+      return;
+    }
+    setLoadingWards(true);
+    fetchWardsByProvinceCode(selectedProvinceCode)
+      .then(setWards)
+      .catch(() => toast.error("Không thể tải danh sách phường/xã"))
+      .finally(() => setLoadingWards(false));
+  }, [selectedProvinceCode]);
   
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
     fullName: "",
     address: "",
-    city: "",
-    state: "",
-    zipCode: "",
-    country: "",
+    ward: "",
+    province: "",
     phone: "",
   });
+
+  const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState<number | null>(null);
+  const [shippingBreakdown, setShippingBreakdown] = useState<{
+    baseFee: number;
+    distanceFee: number;
+    weightFee: number;
+    surcharge: number;
+    distanceKm: number;
+    itemCount: number;
+  } | null>(null);
+
+  const currentUserEmail = localStorage.getItem("current_user_email") || "";
+  const pastAddresses = Array.from(
+    new Map(
+      orders
+        .filter(o => o.buyerEmail === currentUserEmail)
+        .map(o => [
+          o.shippingAddress.address + o.shippingAddress.province, 
+          o.shippingAddress
+        ])
+    ).values()
+  ).slice(0, 5);
 
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryOption>(DELIVERY_OPTIONS[0]);
   const [selectedPayment, setSelectedPayment] = useState(PAYMENT_METHODS[0].id);
@@ -58,7 +107,7 @@ export function Checkout() {
   const voucherDiscount = computeVoucherDiscount(appliedVoucher);
 
   const tax = subtotal * 0.1;
-  const deliveryFee = selectedDelivery.price;
+  const deliveryFee = dynamicDeliveryFee !== null ? dynamicDeliveryFee : selectedDelivery.price;
   const total = subtotal - voucherDiscount + tax + deliveryFee;
 
   // Check if cart has perishable items
@@ -85,17 +134,11 @@ export function Checkout() {
     if (!shippingAddress.address.trim() || shippingAddress.address.length < 5) {
       newErrors.address = "Cần nhập địa chỉ hợp lệ";
     }
-    if (!shippingAddress.city.trim() || shippingAddress.city.length < 2) {
-      newErrors.city = "Cần nhập thành phố";
+    if (!shippingAddress.province) {
+      newErrors.province = "Cần chọn tỉnh/thành phố";
     }
-    if (!shippingAddress.state.trim()) {
-      newErrors.state = "Cần nhập tỉnh/thành";
-    }
-    if (!/^\d{5}(-\d{4})?$/.test(shippingAddress.zipCode)) {
-      newErrors.zipCode = "Cần nhập mã bưu điện hợp lệ";
-    }
-    if (!shippingAddress.country.trim()) {
-      newErrors.country = "Cần nhập quốc gia";
+    if (!shippingAddress.ward) {
+      newErrors.ward = "Cần chọn phường/xã";
     }
     if (!/^\+?[\d\s-()]{10,}$/.test(shippingAddress.phone)) {
       newErrors.phone = "Cần nhập số điện thoại hợp lệ";
@@ -128,8 +171,91 @@ export function Checkout() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleNext = () => {
+  // Lưu khoảng cách đã tính (GPS) để tái sử dụng khi đổi phương thức vận chuyển
+  const [cachedDistanceKm, setCachedDistanceKm] = useState<number | null>(null);
+  const [isRecalculating, setIsRecalculating] = useState(false);
+
+  /**
+   * Tính phí vận chuyển động dựa trên:
+   * - deliveryOpt: phương thức vận chuyển được chọn
+   * - useCache: true → dùng khoảng cách GPS đã cache, false → gọi API mới
+   */
+  const calculateDynamicShippingFee = async (
+    deliveryOpt: DeliveryOption = selectedDelivery,
+    useCache: boolean = false
+  ) => {
+    // Miễn phí vận chuyển – bỏ qua tính toán
+    if (deliveryOpt.id === "free") {
+      setShippingBreakdown(null);
+      setDynamicDeliveryFee(0);
+      return;
+    }
+
+    const cartItemsCount = cart.reduce((acc, curr) => acc + curr.quantity, 0);
+    let distanceKm = useCache && cachedDistanceKm !== null ? cachedDistanceKm : 10;
+
+    if (!useCache || cachedDistanceKm === null) {
+      try {
+        const q = encodeURIComponent(`${shippingAddress.ward}, ${shippingAddress.province}, Vietnam`);
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}`);
+        const data = await res.json();
+        if (data && data.length > 0) {
+          const storeLat = 10.7732;
+          const storeLon = 106.7027;
+          const userLat = parseFloat(data[0].lat);
+          const userLon = parseFloat(data[0].lon);
+
+          const R = 6371;
+          const dLat = (userLat - storeLat) * Math.PI / 180;
+          const dLon = (userLon - storeLon) * Math.PI / 180;
+          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(storeLat * Math.PI / 180) * Math.cos(userLat * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          distanceKm = R * c;
+        } else {
+          if (!shippingAddress.province.toLowerCase().includes("hồ chí minh")) distanceKm = 300;
+        }
+      } catch (err) {
+        if (!shippingAddress.province.toLowerCase().includes("hồ chí minh")) distanceKm = 300;
+      }
+      setCachedDistanceKm(distanceKm);
+    }
+
+    const ratePerKm = 500;
+    const weightBuffer = cartItemsCount * 2000;
+    const surcharge = distanceKm > 100 ? 25000 : distanceKm > 30 ? 10000 : 0; 
+    
+    const baseFee = deliveryOpt.price;
+    const distanceFee = Math.round(distanceKm) * ratePerKm;
+    const totalFee = baseFee + distanceFee + weightBuffer + surcharge;
+
+    setShippingBreakdown({
+      baseFee,
+      distanceFee,
+      weightFee: weightBuffer,
+      surcharge,
+      distanceKm: Math.round(distanceKm),
+      itemCount: cartItemsCount,
+    });
+    setDynamicDeliveryFee(totalFee);
+  };
+
+  // Tự động tính lại phí khi đổi phương thức vận chuyển (step >= 2)
+  useEffect(() => {
+    if (step < 2) return; // Chưa tới bước chọn vận chuyển
+    setIsRecalculating(true);
+    calculateDynamicShippingFee(selectedDelivery, true).finally(() =>
+      setIsRecalculating(false)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDelivery]);
+
+  const handleNext = async () => {
     if (step === 1 && validateShipping()) {
+      toast.loading("Đang tính phí vận chuyển...");
+      await calculateDynamicShippingFee(selectedDelivery, false);
+      toast.dismiss();
       setStep(2);
     } else if (step === 2) {
       setStep(3);
@@ -229,7 +355,72 @@ export function Checkout() {
                 <h2 className="text-xl font-bold">Địa chỉ giao hàng</h2>
               </div>
 
+              {/* ═══ Cách tính phí vận chuyển ═══ */}
+              <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+                <div className="flex items-center gap-2 mb-3">
+                  <Info className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-bold text-blue-900 text-sm">Cách tính phí vận chuyển</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-blue-800">
+                  <div className="flex items-start gap-2 p-2 bg-white/60 rounded-lg">
+                    <span className="text-base leading-none">📦</span>
+                    <div>
+                      <p className="font-semibold">Phí cơ bản</p>
+                      <p>Theo phương thức vận chuyển bạn chọn (Tiêu chuẩn / Nhanh / Trong ngày)</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 p-2 bg-white/60 rounded-lg">
+                    <span className="text-base leading-none">📍</span>
+                    <div>
+                      <p className="font-semibold">Phí khoảng cách</p>
+                      <p>500₫/km từ kho hàng đến địa chỉ giao, tính bằng GPS</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 p-2 bg-white/60 rounded-lg">
+                    <span className="text-base leading-none">⚖️</span>
+                    <div>
+                      <p className="font-semibold">Phí đóng gói</p>
+                      <p>2.000₫ mỗi sản phẩm (bao gồm bao bì, đóng gói an toàn)</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 p-2 bg-white/60 rounded-lg">
+                    <span className="text-base leading-none">🚛</span>
+                    <div>
+                      <p className="font-semibold">Phụ phí vùng xa</p>
+                      <p>+10.000₫ nếu &gt;30km, +25.000₫ nếu &gt;100km</p>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-blue-700 mt-3 italic">
+                  💡 Phí vận chuyển sẽ được tính chính xác sau khi bạn điền đầy đủ địa chỉ.
+                </p>
+              </div>
+
               <div className="space-y-4">
+                {pastAddresses.length > 0 && (
+                  <div className="mb-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <label className="block text-sm font-semibold mb-2 text-blue-800">
+                      Hoặc chọn địa chỉ đã dùng:
+                    </label>
+                    <select
+                      className="w-full px-3 py-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      onChange={(e) => {
+                        const addr = pastAddresses.find((a: any) => a.address + a.province === e.target.value);
+                        if (addr) {
+                          setShippingAddress(addr as ShippingAddress);
+                        }
+                      }}
+                      defaultValue=""
+                    >
+                      <option value="" disabled>-- Chọn địa chỉ đã dùng --</option>
+                      {pastAddresses.map((addr: any, idx) => (
+                        <option key={idx} value={addr.address + addr.province}>
+                          {addr.address}, {addr.ward}, {addr.province}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-semibold mb-1">
                     Họ Tên *
@@ -270,84 +461,58 @@ export function Checkout() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold mb-1">Thành phố *</label>
-                    <input
-                      type="text"
-                      value={shippingAddress.city}
-                      onChange={(e) =>
-                        setShippingAddress({ ...shippingAddress, city: e.target.value })
-                      }
-                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors.city ? "border-red-500" : "border-gray-300"
+                    <label className="block text-sm font-semibold mb-1">Tỉnh/Thành phố *</label>
+                    <select
+                      value={shippingAddress.province}
+                      onChange={(e) => {
+                        const selected = provinces.find((p) => p.name === e.target.value);
+                        setShippingAddress({ ...shippingAddress, province: e.target.value, ward: "" });
+                        setSelectedProvinceCode(selected ? selected.code : null);
+                        setCachedDistanceKm(null); // Reset cache khi đổi tỉnh/thành
+                      }}
+                      disabled={loadingProvinces}
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${
+                        errors.province ? "border-red-500" : "border-gray-300"
                       }`}
-                      placeholder="TP. Hồ Chí Minh"
-                    />
-                    {errors.city && (
-                      <p className="text-red-500 text-sm mt-1">{errors.city}</p>
-                    )}
+                    >
+                      <option value="">{loadingProvinces ? "Đang tải..." : "Chọn Tỉnh/Thành"}</option>
+                      {provinces.map((p) => (
+                        <option key={p.code} value={p.name}>{p.name}</option>
+                      ))}
+                    </select>
+                    {errors.province && <p className="text-red-500 text-sm mt-1">{errors.province}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold mb-1">Tỉnh/Thành phố *</label>
-                    <input
-                      type="text"
-                      value={shippingAddress.state}
-                      onChange={(e) =>
-                        setShippingAddress({ ...shippingAddress, state: e.target.value })
-                      }
-                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors.state ? "border-red-500" : "border-gray-300"
+                    <label className="block text-sm font-semibold mb-1">Phường/Xã *</label>
+                    <select
+                      value={shippingAddress.ward}
+                      onChange={(e) => {
+                        setShippingAddress({ ...shippingAddress, ward: e.target.value });
+                        setCachedDistanceKm(null); // Reset cache khi đổi phường/xã
+                      }}
+                      disabled={!shippingAddress.province || loadingWards}
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${
+                        errors.ward ? "border-red-500" : "border-gray-300"
                       }`}
-                      placeholder="Hồ Chí Minh"
-                    />
-                    {errors.state && (
-                      <p className="text-red-500 text-sm mt-1">{errors.state}</p>
-                    )}
+                    >
+                      <option value="">{loadingWards ? "Đang tải..." : "Chọn Phường/Xã"}</option>
+                      {wards.map((w) => (
+                        <option key={w.code} value={w.name}>{w.name}</option>
+                      ))}
+                    </select>
+                    {errors.ward && <p className="text-red-500 text-sm mt-1">{errors.ward}</p>}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold mb-1">
-                      Mã bưu điện *
-                    </label>
-                    <input
-                      type="text"
-                      value={shippingAddress.zipCode}
-                      onChange={(e) =>
-                        setShippingAddress({ ...shippingAddress, zipCode: e.target.value })
-                      }
-                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors.zipCode ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder="70000"
-                    />
-                    {errors.zipCode && (
-                      <p className="text-red-500 text-sm mt-1">{errors.zipCode}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold mb-1">
-                      Quốc gia *
-                    </label>
-                    <input
-                      type="text"
-                      value={shippingAddress.country}
-                      onChange={(e) =>
-                        setShippingAddress({ ...shippingAddress, country: e.target.value })
-                      }
-                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors.country ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder="Việt Nam"
-                    />
-                    {errors.country && (
-                      <p className="text-red-500 text-sm mt-1">{errors.country}</p>
-                    )}
-                  </div>
+                {/* Ghi chú: Theo Nghị quyết 202/2025/QH15 */}
+                <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-xs text-amber-800 flex items-center gap-1">
+                    <Info className="w-3.5 h-3.5 flex-shrink-0" />
+                    Địa giới hành chính theo Nghị quyết 202/2025/QH15 (mô hình 2 cấp: Tỉnh/TP → Phường/Xã, có hiệu lực từ 01/07/2025).
+                  </p>
                 </div>
 
                 <div>
@@ -412,13 +577,18 @@ export function Checkout() {
 
               {/* Delivery Method Selection */}
               <div className="space-y-3 mb-6">
-                {DELIVERY_OPTIONS.map((option) => (
+                {DELIVERY_OPTIONS.map((option) => {
+                  // Miễn Phí chỉ khả dụng khi đơn >= 500.000₫
+                  const isFreeDisabled = option.id === "free" && subtotal < 500000;
+                  return (
                   <label
                     key={option.id}
-                    className={`block p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                      selectedDelivery.id === option.id
-                        ? "border-blue-600 bg-blue-50"
-                        : "border-gray-200 hover:border-gray-300"
+                    className={`block p-4 border-2 rounded-lg transition-colors ${
+                      isFreeDisabled
+                        ? "border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed"
+                        : selectedDelivery.id === option.id
+                          ? "border-blue-600 bg-blue-50 cursor-pointer"
+                          : "border-gray-200 hover:border-gray-300 cursor-pointer"
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -427,20 +597,25 @@ export function Checkout() {
                           type="radio"
                           name="delivery"
                           checked={selectedDelivery.id === option.id}
-                          onChange={() => setSelectedDelivery(option)}
+                          onChange={() => !isFreeDisabled && setSelectedDelivery(option)}
+                          disabled={isFreeDisabled}
                           className="w-5 h-5 text-blue-600"
                         />
                         <div>
                           <p className="font-semibold">{option.name}</p>
                           <p className="text-sm text-gray-600">{option.estimatedDays}</p>
+                          {isFreeDisabled && (
+                            <p className="text-xs text-red-500 mt-0.5">Cần đơn tối thiểu 500.000₫</p>
+                          )}
                         </div>
                       </div>
                       <p className="font-bold">
-                        {option.price === 0 ? "MIỄN PHÍ" : `${option.price.toLocaleString("vi-VN")}₫`}
+                        {option.price === 0 ? "MIỄN PHÍ" : `Phí cơ bản ${option.price.toLocaleString("vi-VN")}₫`}
                       </p>
                     </div>
                   </label>
-                ))}
+                  );
+                })}
               </div>
 
               {/* ═══ Delivery Slot Selection ═══ */}
@@ -866,11 +1041,53 @@ export function Checkout() {
               {step >= 2 && (
                 <>
                   <div className="flex justify-between text-gray-700">
-                    <span>Vận chuyển</span>
+                    <span className="flex items-center gap-1">
+                      Vận chuyển
+                      {isRecalculating && (
+                        <span className="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                      )}
+                    </span>
                     <span>
-                      {deliveryFee === 0 ? "MIỄN PHÍ" : `${deliveryFee.toLocaleString("vi-VN")}₫`}
+                      {isRecalculating
+                        ? "Đang tính..."
+                        : deliveryFee === 0
+                          ? "MIỄN PHÍ"
+                          : `${deliveryFee.toLocaleString("vi-VN")}₫`}
                     </span>
                   </div>
+
+                  {/* ── Chi tiết tính phí vận chuyển ── */}
+                  {shippingBreakdown && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs space-y-1.5">
+                      <p className="font-semibold text-blue-900 flex items-center gap-1 text-sm mb-2">
+                        <MapPin className="w-3.5 h-3.5" />
+                        Chi tiết phí vận chuyển
+                      </p>
+                      <div className="flex justify-between text-blue-800">
+                        <span>Phí cơ bản ({selectedDelivery.name}):</span>
+                        <span>{shippingBreakdown.baseFee.toLocaleString("vi-VN")}₫</span>
+                      </div>
+                      <div className="flex justify-between text-blue-800">
+                        <span>Phí khoảng cách (~{shippingBreakdown.distanceKm} km × 500₫/km):</span>
+                        <span>{shippingBreakdown.distanceFee.toLocaleString("vi-VN")}₫</span>
+                      </div>
+                      <div className="flex justify-between text-blue-800">
+                        <span>Phí đóng gói ({shippingBreakdown.itemCount} sản phẩm × 2.000₫):</span>
+                        <span>{shippingBreakdown.weightFee.toLocaleString("vi-VN")}₫</span>
+                      </div>
+                      {shippingBreakdown.surcharge > 0 && (
+                        <div className="flex justify-between text-orange-700">
+                          <span>Phụ phí vùng xa ({shippingBreakdown.distanceKm > 100 ? ">100km" : ">30km"}):</span>
+                          <span>{shippingBreakdown.surcharge.toLocaleString("vi-VN")}₫</span>
+                        </div>
+                      )}
+                      <div className="border-t border-blue-300 pt-1 mt-1 flex justify-between font-bold text-blue-900">
+                        <span>Tổng phí vận chuyển:</span>
+                        <span>{deliveryFee.toLocaleString("vi-VN")}₫</span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex justify-between text-gray-600 text-sm">
                     <span>Khung giờ</span>
                     <span>{DELIVERY_SLOTS.find(s => s.id === selectedSlot)?.label} ({DELIVERY_SLOTS.find(s => s.id === selectedSlot)?.timeRange})</span>
