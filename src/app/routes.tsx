@@ -53,30 +53,33 @@ function withSuspense(LazyComponent: ComponentType) {
   };
 }
 
-export const router = createBrowserRouter([
-  {
-    path: "/auth",
-    Component: withSuspense(Auth),
-  },
-  {
-    path: "/",
-    Component: Layout,
-    children: [
-      { index: true, Component: withSuspense(Home) },
-      { path: "products", Component: withSuspense(Products) },
-      { path: "products/:id", Component: withSuspense(ProductDetail) },
-      { path: "cart", Component: withSuspense(Cart) },
-      { path: "checkout", Component: withSuspense(Checkout) },
-      { path: "orders", Component: withSuspense(Orders) },
-      { path: "wishlist", Component: withSuspense(Wishlist) },
-      { path: "profile", Component: withSuspense(Profile) },
-      { path: "contact", Component: withSuspense(Contact) },
-      { path: "farm-story", Component: withSuspense(FarmStory) },
-      { path: "subscription", Component: withSuspense(Subscription) },
-      { path: "loyalty", Component: withSuspense(Loyalty) },
-      { path: "issue-center", Component: withSuspense(IssueCenter) },
-      { path: "admin", Component: withSuspense(Admin) },
-      { path: "*", Component: withSuspense(NotFound) },
-    ],
-  },
-]);
+export const router = createBrowserRouter(
+  [
+    {
+      path: "/auth",
+      Component: withSuspense(Auth),
+    },
+    {
+      path: "/",
+      Component: Layout,
+      children: [
+        { index: true, Component: withSuspense(Home) },
+        { path: "products", Component: withSuspense(Products) },
+        { path: "products/:id", Component: withSuspense(ProductDetail) },
+        { path: "cart", Component: withSuspense(Cart) },
+        { path: "checkout", Component: withSuspense(Checkout) },
+        { path: "orders", Component: withSuspense(Orders) },
+        { path: "wishlist", Component: withSuspense(Wishlist) },
+        { path: "profile", Component: withSuspense(Profile) },
+        { path: "contact", Component: withSuspense(Contact) },
+        { path: "farm-story", Component: withSuspense(FarmStory) },
+        { path: "subscription", Component: withSuspense(Subscription) },
+        { path: "loyalty", Component: withSuspense(Loyalty) },
+        { path: "issue-center", Component: withSuspense(IssueCenter) },
+        { path: "admin", Component: withSuspense(Admin) },
+        { path: "*", Component: withSuspense(NotFound) },
+      ],
+    },
+  ],
+  { basename: import.meta.env.BASE_URL }
+);
