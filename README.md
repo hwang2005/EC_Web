@@ -10,9 +10,9 @@ This specialized platform connects agricultural producers directly with consumer
 
 *   **Robust Product Management**: Specialized product sheets encompassing health/quality certifications (VietGAP, GlobalGAP) for Vegetables, Fruits, and Regional Specialties.
 *   **Advanced Delivery Workflows**:
-    *   **Dynamic Addresses**: Integrates open APIs (`provinces.open-api.vn`) for interactive location selection.
+    *   **Dynamic Addresses**: Integrates open APIs for interactive location selection.
     *   **Time-slotted Shipments**: Restricts deliveries to specific intra-day windows (8h-12h, 12h-15h, 15h-18h, 18h-21h) to ensure recipients are available. 
-    *   **Subscription Models (Giao hàng định kỳ)**: Flexible, recurring delivery schedules letting users build subscription combos effortlessly.
+    *   **Subscription Models**: Flexible, recurring delivery schedules letting users build subscription combos effortlessly.
     *   **Dynamic Shipping Realities**: Instantly recalculating delivery costs based on cart dimensions and requested zones.
 *   **Gamified User Retention**: Includes Rank-based systems (Standard, Premium, VIP, VVIP) applying hidden vouchers and personalized price adjustments.
 *   **Order & Issue Logistics**: Complete lifecycle tracking (`Pending` to `Delivered`). Seamless claim tools like "Report Quality Issue" for prompt D2C resolutions.
