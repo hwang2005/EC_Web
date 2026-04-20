@@ -1,5 +1,7 @@
 # D2C Agricultural E-commerce Platform
 
+🌐 **Live Demo**: [https://hwang2005.github.io/EC_Web/](https://hwang2005.github.io/EC_Web/)
+
 This is a code bundle for an E-commerce demo website, designed specifically as a Direct-to-Consumer (D2C) marketplace for agricultural produce. The original UI prototype is available at [Figma](https://www.figma.com/design/YZqlkRCUMX54CqxZBl8iSJ/Ecommerce-demo-website).
 
 ## 🌾 Project Overview
@@ -57,3 +59,19 @@ npm run build
 ```
 
 The optimized code will be cleanly bundled into the `dist` folder. *(Note: Ensure the host server natively supports SPA routing rewrites to point unresolved endpoints back towards `index.html`)*.
+
+## 🚢 Deployment (GitHub Pages)
+
+The site is automatically deployed to **GitHub Pages** on every push to `main` via the included GitHub Actions workflow (`.github/workflows/deploy.yml`).
+
+### One-time setup
+
+1. Go to **Settings → Pages** in this repository.
+2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
+3. Push to `main` — the workflow will build and deploy automatically.
+
+### How it works
+
+- **Vite** builds the app with `base: '/EC_Web/'` so all asset paths are correct for the Pages subdirectory.
+- The router uses `import.meta.env.BASE_URL` as its `basename`, keeping client-side navigation working at the `/EC_Web/` prefix.
+- `dist/404.html` (a copy of `index.html`) is deployed alongside the app so that GitHub Pages serves the SPA shell for any deep-link URL instead of returning a real 404.
