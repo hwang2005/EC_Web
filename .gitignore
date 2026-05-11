@@ -4,3 +4,4 @@ chatbot-server/.env
 chatbot-server/chroma_data/
 chatbot-server/__pycache__/
 chatbot-server/knowledge_base/*
+.venv/

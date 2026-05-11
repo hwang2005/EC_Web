@@ -101,8 +101,10 @@ Notes:
 - The backend uses Ollama for both chat generation and vector embeddings.
 - By default, `.env.example` is configured with:
   - `OLLAMA_BASE_URL=http://localhost:11434`
+  - `OLLAMA_MODELS=YOUR DIRECTORY FOR OLLAMA MODELS`
   - `OLLAMA_MODEL=llama3`
   - `OLLAMA_EMBED_MODEL=llama3`
+- On startup, the backend now tries to start `ollama serve` automatically with `OLLAMA_MODELS` if local manifests are found in that folder.
 - If Ollama is not running, or the configured model does not exist locally, the backend can still start, but `/api/chat` will return an error response instead of an AI-generated answer.
 
 ### Step 4: Start the Backend
@@ -189,16 +191,45 @@ The optimized output is generated in the `dist` folder.
 
 ## Deployment
 
-The site is automatically deployed to **GitHub Pages** on every push to `main` via the included GitHub Actions workflow at `.github/workflows/deploy.yml`.
+The frontend of this application is fully configured for automatic deployment to **GitHub Pages** using GitHub Actions. Every time you push or merge code to the `main` branch, the workflow defined in `.github/workflows/deploy.yml` will automatically build the production assets and publish them to your GitHub Pages URL.
 
-### One-time Setup
+> **Note on Backend Deployment**: GitHub Pages only hosts static files (HTML, CSS, JS). The Python FastAPI `chatbot-server` is not deployed via this workflow. However, the frontend is designed to gracefully degrade. If the `/api/chat` endpoint is unreachable in the production environment, the chatbot will automatically fall back to its internal, robust rule-based logic without breaking the user experience.
 
-1. Go to **Settings > Pages** in this repository.
-2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
-3. Push to `main` and the workflow will build and deploy automatically.
+### Step-by-step One-time Setup
 
-### Deployment Details
+To enable the automatic deployment for your own fork or repository, follow these detailed steps:
 
-- Vite builds the app with `base: '/EC_Web/'` so all asset paths work correctly for the GitHub Pages subdirectory.
-- The router uses `import.meta.env.BASE_URL` as its `basename`, so client-side navigation works under `/EC_Web/`.
-- `dist/404.html` is deployed alongside the app so GitHub Pages serves the SPA shell for deep links instead of returning a real 404 page.
+1. **Navigate to Repository Settings**:
+   - Go to your repository on GitHub.
+   - Click on the **Settings** tab (the gear icon) located near the top right of the repository page.
+
+2. **Configure Actions Permissions** (Important):
+   - In the left sidebar, scroll down to the **Code and automation** section and click on **Actions**, then **General**.
+   - Scroll down to the **Workflow permissions** section.
+   - Select **Read and write permissions**. (This allows the GitHub Actions bot to deploy the built files).
+   - Click **Save**.
+
+3. **Configure GitHub Pages Source**:
+   - In the left sidebar, under the **Code and automation** section, click on **Pages**.
+   - Under the **Build and deployment** section, look for the **Source** dropdown menu.
+   - Change the source from *Deploy from a branch* to **GitHub Actions**.
+
+4. **Trigger the First Deployment**:
+   - Make a change, commit, and push to the `main` branch.
+   - Alternatively, you can go to the **Actions** tab in your repository, select the deployment workflow, and manually trigger it using the **Run workflow** button (if workflow dispatch is enabled).
+   - Wait for the workflow to complete. It will show a green checkmark when finished.
+   - Your site will be available at: `https://<your-username>.github.io/<your-repo-name>/` (e.g., `https://hwang2005.github.io/EC_Web/`).
+
+### Deployment Details & Technical Architecture
+
+The deployment setup includes several specific configurations to ensure the React Single Page Application (SPA) works flawlessly on GitHub Pages:
+
+- **Base Path Configuration**: 
+  - In `vite.config.ts`, the build is configured with `base: '/EC_Web/'`. This ensures that all generated asset paths (CSS, JS, images) are correctly prefixed with the repository name, which is necessary since GitHub Pages hosts project sites in a subdirectory rather than at the root domain.
+  
+- **Router Basename**: 
+  - The React Router uses `import.meta.env.BASE_URL` as its `basename`. This guarantees that client-side navigation (like navigating to `/products` or `/cart`) works correctly under the `/EC_Web/` path prefix without breaking.
+
+- **SPA Routing Fix (The 404 Hack)**: 
+  - GitHub Pages does not natively support SPA routing. If a user directly accesses a deep link (e.g., `https://hwang2005.github.io/EC_Web/cart`), GitHub Pages will normally look for a `cart.html` file, fail to find it, and return a 404 error.
+  - To solve this, a `dist/404.html` is generated (usually a copy of `index.html`) and deployed alongside the application. When GitHub Pages encounters a missing route, it serves `404.html`, which loads the React application. The React Router then takes over, reads the URL, and renders the correct view seamlessly.

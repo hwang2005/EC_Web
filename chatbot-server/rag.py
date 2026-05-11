@@ -12,7 +12,10 @@ import hashlib
 import io
 import json
 import os
+import shutil
+import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -36,7 +39,12 @@ EMBEDDING_PROVIDER = "ollama"
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
 OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", OLLAMA_MODEL)
-OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "30"))
+OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))
+OLLAMA_EMBED_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_EMBED_TIMEOUT_SECONDS", "300"))
+OLLAMA_EMBED_BATCH_SIZE = int(os.getenv("OLLAMA_EMBED_BATCH_SIZE", "10"))
+OLLAMA_MODELS_DIR = Path(
+    os.getenv("OLLAMA_MODELS", str(Path.home() / ".ollama" / "models"))
+).expanduser()
 
 SYSTEM_PROMPT = """Bạn là "Trợ Lý Nông Sản Việt", chatbot hỗ trợ khách hàng của cửa hàng thương mại điện tử nông sản Nông Sản Việt.
 
@@ -127,15 +135,19 @@ class RAGEngine:
         self.ollama_model = OLLAMA_MODEL
         self.ollama_embed_model = OLLAMA_EMBED_MODEL
         self.ollama_timeout = OLLAMA_TIMEOUT_SECONDS
+        self.ollama_models_dir = OLLAMA_MODELS_DIR
         self.has_llama = False
         # Keep legacy name for compatibility with existing health checks.
         self.has_openai = False
         self.provider_status_message = ""
         self.embedding_status_message = ""
+        self._ollama_autostart_attempted = False
 
         self.chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
         self.collection_name = "nong_san_viet"
 
+        if self._list_local_model_names():
+            self._start_ollama_server()
         self._load_knowledge()
         self.refresh_provider_status()
 
@@ -209,6 +221,7 @@ class RAGEngine:
             f"[EMBED] Indexing {len(documents)} chunks with Ollama embeddings "
             f"({self.ollama_embed_model})..."
         )
+        self._warmup_model()
         indexed_count = 0
         try:
             embeddings = self._embed_texts(documents)
@@ -224,7 +237,12 @@ class RAGEngine:
 
         print(f"[OK] Indexed {indexed_count} knowledge chunks into ChromaDB")
 
-    def _post_json(self, endpoint: str, payload: Optional[Dict] = None) -> Dict:
+    def _post_json(
+        self,
+        endpoint: str,
+        payload: Optional[Dict] = None,
+        timeout_override: Optional[float] = None,
+    ) -> Dict:
         data = None if payload is None else json.dumps(payload).encode("utf-8")
         request = urllib.request.Request(
             url=f"{self.ollama_base_url}{endpoint}",
@@ -232,25 +250,118 @@ class RAGEngine:
             headers={"Content-Type": "application/json"},
             method="POST" if payload is not None else "GET",
         )
-        with urllib.request.urlopen(request, timeout=self.ollama_timeout) as response:
+        timeout = timeout_override if timeout_override is not None else self.ollama_timeout
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
 
+    def _list_local_model_names(self) -> List[str]:
+        """Read Ollama manifests to discover locally installed models."""
+        manifests_root = self.ollama_models_dir / "manifests" / "registry.ollama.ai" / "library"
+        if not manifests_root.exists():
+            return []
+
+        local_models = set()
+        for model_dir in manifests_root.iterdir():
+            if not model_dir.is_dir():
+                continue
+            tags = [tag_file.name for tag_file in model_dir.iterdir() if tag_file.is_file()]
+            if not tags:
+                continue
+            local_models.add(model_dir.name)
+            for tag in tags:
+                local_models.add(f"{model_dir.name}:{tag}")
+        return sorted(local_models)
+
+    def _start_ollama_server(self) -> bool:
+        """Start `ollama serve` with the configured local model store."""
+        if self._ollama_autostart_attempted:
+            return False
+        self._ollama_autostart_attempted = True
+
+        ollama_executable = shutil.which("ollama")
+        if not ollama_executable:
+            return False
+
+        env = os.environ.copy()
+        env["OLLAMA_MODELS"] = str(self.ollama_models_dir)
+
+        startupinfo = None
+        creationflags = 0
+        if os.name == "nt":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+        try:
+            subprocess.Popen(
+                [ollama_executable, "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                env=env,
+                startupinfo=startupinfo,
+                creationflags=creationflags,
+            )
+        except Exception:
+            return False
+
+        for _ in range(10):
+            time.sleep(1)
+            try:
+                self._post_json("/api/tags")
+                return True
+            except Exception:
+                continue
+        return False
+
+    def _model_exists(self, available_models: List[str], expected_model: str) -> bool:
+        return any(
+            model_name == expected_model or model_name.startswith(f"{expected_model}:")
+            for model_name in available_models
+        )
+
+    def _warmup_model(self):
+        """Pre-load the embedding model into memory with a trivial request."""
+        print(f"[LOAD] Pre-loading model '{self.ollama_embed_model}' into memory...")
+        try:
+            payload = {"model": self.ollama_embed_model, "input": ["warmup"]}
+            self._post_json("/api/embed", payload, timeout_override=OLLAMA_EMBED_TIMEOUT_SECONDS)
+            print(f"[OK] Model '{self.ollama_embed_model}' loaded successfully.")
+        except Exception as exc:
+            print(f"[WARN] Model warmup failed: {exc}")
+
     def _embed_texts(self, texts: List[str]) -> List[List[float]]:
-        """Generate embeddings for a batch of texts using Ollama."""
+        """Generate embeddings for a batch of texts using Ollama (batched)."""
         if not texts:
             return []
 
-        payload = {
-            "model": self.ollama_embed_model,
-            "input": texts,
-        }
-        response = self._post_json("/api/embed", payload)
-        embeddings = response.get("embeddings")
-        if not embeddings:
-            raise RuntimeError(
-                f"Ollama model '{self.ollama_embed_model}' không trả về embeddings."
+        all_embeddings: List[List[float]] = []
+        batch_size = OLLAMA_EMBED_BATCH_SIZE
+        total_batches = (len(texts) + batch_size - 1) // batch_size
+
+        for batch_idx in range(total_batches):
+            start = batch_idx * batch_size
+            end = min(start + batch_size, len(texts))
+            batch = texts[start:end]
+
+            if total_batches > 1:
+                print(f"  Batch {batch_idx + 1}/{total_batches} ({len(batch)} texts)...")
+
+            payload = {
+                "model": self.ollama_embed_model,
+                "input": batch,
+            }
+            response = self._post_json(
+                "/api/embed", payload, timeout_override=OLLAMA_EMBED_TIMEOUT_SECONDS
             )
-        return embeddings
+            embeddings = response.get("embeddings")
+            if not embeddings:
+                raise RuntimeError(
+                    f"Ollama model '{self.ollama_embed_model}' không trả về embeddings."
+                )
+            all_embeddings.extend(embeddings)
+
+        return all_embeddings
 
     def _can_embed(self) -> bool:
         """Check whether the configured embedding model can produce vectors."""
@@ -268,19 +379,13 @@ class RAGEngine:
         """Check whether Ollama is running and the configured models are available."""
         try:
             data = self._post_json("/api/tags")
-            available_models = {
+            available_models = sorted({
                 model.get("name", "")
                 for model in data.get("models", [])
                 if isinstance(model, dict)
-            }
-            chat_model_exists = any(
-                model_name == self.ollama_model or model_name.startswith(f"{self.ollama_model}:")
-                for model_name in available_models
-            )
-            embed_model_exists = any(
-                model_name == self.ollama_embed_model or model_name.startswith(f"{self.ollama_embed_model}:")
-                for model_name in available_models
-            )
+            })
+            chat_model_exists = self._model_exists(available_models, self.ollama_model)
+            embed_model_exists = self._model_exists(available_models, self.ollama_embed_model)
             if chat_model_exists and embed_model_exists and self._can_embed():
                 self.has_llama = True
                 self.has_openai = True
@@ -289,6 +394,7 @@ class RAGEngine:
 
             self.has_llama = False
             self.has_openai = False
+            local_models = self._list_local_model_names()
             missing_models = []
             if not chat_model_exists:
                 missing_models.append(self.ollama_model)
