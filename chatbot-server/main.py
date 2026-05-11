@@ -24,7 +24,7 @@ from rag import RAGEngine
 
 app = FastAPI(
     title="Nong San Viet Chatbot API",
-    description="RAG-powered chatbot using ChromaDB + OpenAI",
+    description="RAG-powered chatbot using ChromaDB + Ollama Llama 3",
     version="1.0.0",
 )
 
@@ -65,11 +65,12 @@ class ChatResponse(BaseModel):
 
 @app.get("/api/health")
 async def health():
-    has_openai = rag_engine.has_openai if rag_engine else False
+    has_llama = rag_engine.refresh_provider_status() if rag_engine else False
     chunk_count = rag_engine.collection.count() if rag_engine else 0
     return {
         "status": "ok",
-        "openai_configured": has_openai,
+        "openai_configured": has_llama,
+        "llama_configured": has_llama,
         "knowledge_chunks": chunk_count,
     }
 
