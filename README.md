@@ -26,6 +26,7 @@ This specialized platform connects agricultural producers directly with consumer
 *   **Routing**: React Router (v7)
 *   **Styling & UI**: Tailwind CSS (v4), Radix UI Primitives, Material UI (MUI), Framer Motion, Embla Carousel
 *   **Build Tool**: Vite
+*   **AI Chatbot**: Python (FastAPI), OpenAI API (GPT-4o-mini), ChromaDB (Vector DB)
 
 ## 🚀 How to Run the Code
 
@@ -59,6 +60,38 @@ npm run build
 ```
 
 The optimized code will be cleanly bundled into the `dist` folder. *(Note: Ensure the host server natively supports SPA routing rewrites to point unresolved endpoints back towards `index.html`)*.
+
+## 🤖 AI Chatbot Setup (Python Backend)
+
+The chatbot uses a **RAG (Retrieval-Augmented Generation)** pipeline: ChromaDB stores product knowledge as vector embeddings, and OpenAI generates contextual responses.
+
+### Prerequisites
+- Python 3.10+ and `pip`
+- An OpenAI API key ([platform.openai.com](https://platform.openai.com))
+
+### Setup
+
+```bash
+cd chatbot-server
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env and replace sk-your-openai-api-key-here with your real key
+```
+
+### Run the Backend
+
+```bash
+python main.py
+```
+
+The server starts at `http://localhost:8000`. The Vite dev server proxies `/api` requests automatically.
+
+### How it Works
+
+1. Knowledge base contains product info, policies, and farm stories
+2. On startup, the server chunks and embeds all documents into ChromaDB
+3. When a user sends a message, the server retrieves relevant context and generates an answer via OpenAI
+4. If the backend is unreachable, the frontend falls back to an enhanced rule-based chatbot
 
 ## 🚢 Deployment (GitHub Pages)
 
