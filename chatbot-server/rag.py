@@ -48,7 +48,7 @@ OLLAMA_MODELS_DIR = Path(
     os.getenv("OLLAMA_MODELS", str(Path.home() / ".ollama" / "models"))
 ).expanduser()
 
-SYSTEM_PROMPT = """Bạn là "Trợ Lý Nông Sản Việt", chatbot hỗ trợ khách hàng của cửa hàng thương mại điện tử nông sản Nông Sản Việt.
+SYSTEM_PROMPT = """Bạn là "Trợ Lý NOSAVI", chatbot hỗ trợ khách hàng của cửa hàng thương mại điện tử nông sản NOSAVI.
 
 QUY TẮC:
 1. Luôn trả lời bằng tiếng Việt, thân thiện và chuyên nghiệp.

@@ -221,7 +221,7 @@ function getLocalFallbackResponse(userMessage: string, context: ShopContextSnaps
     }
   } else if (messageHasAny(message, ["tro giup", "ho tro", "help", "lien he", "hotline"])) {
     text = [
-      `Liên hệ: ${context.storeProfile.shopName || "Nông Sản Việt"}`,
+      `Liên hệ: ${context.storeProfile.shopName || "NOSAVI"}`,
       `Hotline: ${context.storeProfile.shopPhone || "0912 345 678"}`,
       `Email: ${context.storeProfile.shopEmail || "seller@demo.com"}`,
       "Hoặc hỏi tôi về sản phẩm, giá, giao hàng, thanh toán, voucher, hạng thành viên.",
@@ -247,7 +247,7 @@ export function Chatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
-      text: "Xin chào! 🌾 Tôi là trợ lý ảo của Nông Sản Việt. Bạn có thể hỏi về sản phẩm, giá, tồn kho, nguồn gốc, bảo quản, giao hàng, thanh toán hoặc khuyến mãi.",
+      text: "Xin chào! 🌾 Tôi là trợ lý ảo của NOSAVI. Bạn có thể hỏi về sản phẩm, giá, tồn kho, nguồn gốc, bảo quản, giao hàng, thanh toán hoặc khuyến mãi.",
       sender: "bot",
       timestamp: new Date(),
       mode: "smart",
@@ -400,7 +400,7 @@ export function Chatbot() {
             <div className="flex items-center gap-2">
               <Bot className="w-6 h-6" />
               <div>
-                <h3 className="font-semibold">Trợ Lý Nông Sản Việt</h3>
+                <h3 className="font-semibold">Trợ Lý NOSAVI</h3>
                 <p className="text-xs opacity-90 flex items-center gap-1">
                   <ModeIcon className="w-3 h-3" />
                   {modeLabel}

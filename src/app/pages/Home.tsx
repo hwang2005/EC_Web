@@ -26,7 +26,7 @@ export function Home() {
             <div className="flex items-center gap-3 mb-4">
               <Sprout className="w-12 h-12" />
               <h1 className="font-bold">
-                Nông Sản Việt
+                NOSAVI
               </h1>
             </div>
             <p className="text-xl mb-8 opacity-90">
@@ -86,7 +86,7 @@ export function Home() {
             {[
               { icon: <MapPin className="w-6 h-6 text-green-600" />, title: "Nguồn Gốc Rõ Ràng", desc: "Truy xuất từ nông trại", bg: "bg-green-50" },
               { icon: <Truck className="w-6 h-6 text-blue-600" />, title: "Giao Hàng Nhanh", desc: "Giao trong ngày (đối với khu vực nội thành TP.HCM và Hà Nội)", bg: "bg-blue-50" },
-              { icon: <ShieldCheck className="w-6 h-6 text-amber-600" />, title: "Đổi Trả Dễ Dàng", desc: "Hoàn 100% nếu hàng hỏng", bg: "bg-amber-50" },
+              { icon: <ShieldCheck className="w-6 h-6 text-amber-600" />, title: "Đổi Trả Dễ Dàng", desc: "Hoàn 100% nếu hàng hỏng — khiếu nại trong 24h", bg: "bg-amber-50" },
               { icon: <CreditCard className="w-6 h-6 text-purple-600" />, title: "Thanh Toán An Toàn", desc: "Mã hóa SSL/TLS", bg: "bg-purple-50" },
             ].map((item) => (
               <div key={item.title} className={`flex items-center gap-3 p-4 rounded-xl ${item.bg}`}>
@@ -257,7 +257,7 @@ export function Home() {
               Phản hồi từ cộng đồng
             </div>
             <h2 className="text-foreground font-bold">Khách Hàng Nói Gì</h2>
-            <p className="text-muted-foreground mt-2">Hàng nghìn gia đình tin tưởng chọn Nông Sản Việt</p>
+            <p className="text-muted-foreground mt-2">Hàng nghìn gia đình tin tưởng chọn NOSAVI</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
@@ -541,7 +541,7 @@ export function Home() {
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-primary">✓</span>
-                    Đổi trả trong 7 ngày nếu không hài lòng
+                    Tiếp nhận khiếu nại trong 24 giờ sau giao hàng
                   </li>
                 </ul>
               </div>

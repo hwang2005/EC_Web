@@ -2,7 +2,7 @@ import { Link } from "react-router";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
 import { Crown, Star, Gift, Percent, TrendingUp, ShieldCheck, Truck, Award } from "lucide-react";
-import { CUSTOMER_TIERS } from "../data/products";
+import { CUSTOMER_TIERS, DEFAULT_VOUCHERS } from "../data/products";
 import type { CustomerTier } from "../data/products";
 
 const TIER_DETAILS: Record<
@@ -62,11 +62,6 @@ const TIER_DETAILS: Record<
   },
 };
 
-const VOUCHERS = [
-  { code: "TUOIMOI10", discount: "Giảm 10% đơn rau củ", minOrder: "200.000₫", expiry: "30/06/2026", icon: "🥬" },
-  { code: "TRAICAY50K", discount: "Giảm 50.000₫ đơn trái cây", minOrder: "300.000₫", expiry: "31/05/2026", icon: "🍎" },
-  { code: "FREESHIP", discount: "Miễn phí giao hàng", minOrder: "150.000₫", expiry: "30/04/2026", icon: "🚚" },
-];
 
 export function Loyalty() {
   const { role } = useAuth();
@@ -198,29 +193,47 @@ export function Loyalty() {
           <Gift className="w-6 h-6 text-primary" />
           Voucher Ưu Đãi
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {VOUCHERS.map((voucher) => (
-            <div
-              key={voucher.code}
-              className="bg-white rounded-xl border border-border overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="p-5">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-2xl">{voucher.icon}</span>
-                  <div>
-                    <p className="font-bold text-foreground">{voucher.discount}</p>
-                    <p className="text-xs text-muted-foreground">Đơn tối thiểu {voucher.minOrder}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {DEFAULT_VOUCHERS.map((voucher) => {
+            const icon =
+              voucher.applicableCategories[0] === "all" ? "🎫" :
+              voucher.applicableCategories[0]?.includes("Trái Cây") ? "🍎" :
+              voucher.applicableCategories[0]?.includes("Rau") ? "🥬" :
+              voucher.applicableCategories[0]?.includes("Cà Phê") ? "☕" :
+              voucher.applicableCategories[0]?.includes("Gia Vị") ? "🌶️" : "🏷️";
+            const discountLabel =
+              voucher.discountType === "percent"
+                ? `Giảm ${voucher.discountValue}%${ voucher.maxDiscountAmount ? `, tối đa ${voucher.maxDiscountAmount.toLocaleString("vi-VN")}₫` : "" }`
+                : `Giảm ${voucher.discountValue.toLocaleString("vi-VN")}₫`;
+            const rankLabel =
+              voucher.applicableRanks[0] === "all"
+                ? "Tất cả hạng"
+                : voucher.applicableRanks.join(", ");
+            return (
+              <div
+                key={voucher.id}
+                className="bg-white rounded-xl border border-border overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+              >
+                <div className="p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-2xl">{icon}</span>
+                    <div>
+                      <p className="font-bold text-foreground">{discountLabel}</p>
+                      <p className="text-xs text-muted-foreground">Đơn tối thiểu {voucher.minOrderValue.toLocaleString("vi-VN")}₫</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{voucher.description}</p>
+                  <p className="text-xs text-primary font-medium mb-3">Hạng: {rankLabel}</p>
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+                    <code className="text-sm font-mono bg-accent px-3 py-1 rounded font-bold text-primary">
+                      {voucher.code}
+                    </code>
+                    <span className="text-xs text-muted-foreground">HSD: {new Date(voucher.expiryDate).toLocaleDateString("vi-VN")}</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-                  <code className="text-sm font-mono bg-accent px-3 py-1 rounded font-bold text-primary">
-                    {voucher.code}
-                  </code>
-                  <span className="text-xs text-muted-foreground">HSD: {voucher.expiry}</span>
-                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

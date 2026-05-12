@@ -101,7 +101,7 @@ export function Layout() {
             <Link to="/" className="flex items-center gap-2 shrink-0">
               <Sprout className="w-8 h-8 text-primary" />
               <div>
-                <span className="text-xl font-bold text-foreground">Nông Sản Việt</span>
+                <span className="text-xl font-bold text-foreground">NOSAVI</span>
                 <p className="text-xs text-muted-foreground hidden sm:block">Nông Sản Việt Nam</p>
               </div>
             </Link>
@@ -446,7 +446,7 @@ export function Layout() {
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <Sprout className="w-6 h-6 text-[#8fbc5a]" />
-                <span className="font-bold text-white">Nông Sản Việt</span>
+                <span className="font-bold text-white">NOSAVI</span>
               </div>
               <p className="text-[#a8c8a8] text-sm leading-relaxed">
                 Nền tảng thương mại điện tử nông sản Việt Nam. Kết nối người nông dân với người tiêu dùng.
@@ -483,7 +483,7 @@ export function Layout() {
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-sm text-[#a8c8a8]" style={{ borderColor: "rgba(143, 188, 90, 0.2)" }}>
-            <p>&copy; 2026 Nông Sản Việt. Tất cả các quyền được bảo lưu. Phiên bản demo.</p>
+            <p>&copy; 2026 NOSAVI. Tất cả các quyền được bảo lưu. Phiên bản demo.</p>
           </div>
         </div>
       </footer>

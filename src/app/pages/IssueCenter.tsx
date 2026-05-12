@@ -326,7 +326,7 @@ export function IssueCenter() {
         <div className="flex items-start gap-4">
           <CheckCircle className="w-8 h-8 text-green-600 flex-shrink-0" />
           <div>
-            <h3 className="font-bold text-foreground mb-2">Cam kết của Nông Sản Việt</h3>
+            <h3 className="font-bold text-foreground mb-2">Cam kết của NOSAVI</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-foreground">
               <p>✅ Phản hồi khiếu nại trong vòng 24 giờ</p>
               <p>✅ Hoàn tiền 100% nếu hàng không đạt chất lượng</p>

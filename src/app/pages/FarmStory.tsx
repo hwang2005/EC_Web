@@ -17,7 +17,7 @@ export function FarmStory() {
               <h1 className="text-3xl md:text-4xl font-bold">Câu Chuyện Nông Trại</h1>
             </div>
             <p className="text-lg text-green-100 mb-6">
-              Mỗi sản phẩm trên Nông Sản Việt đều mang theo một câu chuyện — câu chuyện của đất, của nước, 
+              Mỗi sản phẩm trên NOSAVI đều mang theo một câu chuyện — câu chuyện của đất, của nước, 
               của nắng gió và tâm huyết người nông dân. Khám phá hành trình từ nông trại đến bàn ăn gia đình bạn.
             </p>
             <div className="flex items-center gap-3 text-sm text-green-200">

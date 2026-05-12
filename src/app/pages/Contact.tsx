@@ -22,7 +22,7 @@ const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Sản phẩm có nguồn gốc từ đâu?",
     answer:
-      "Tất cả sản phẩm trên Nông Sản Việt đều được thu mua trực tiếp từ các nông hộ và hợp tác xã uy tín trên khắp Việt Nam. Mỗi sản phẩm đều có thông tin rõ ràng về vùng trồng và phương pháp canh tác.",
+      "Tất cả sản phẩm trên NOSAVI đều được thu mua trực tiếp từ các nông hộ và hợp tác xã uy tín trên khắp Việt Nam. Mỗi sản phẩm đều có thông tin rõ ràng về vùng trồng và phương pháp canh tác.",
   },
   {
     question: "Thời gian giao hàng là bao lâu?",
@@ -32,7 +32,7 @@ const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Chính sách đổi trả như thế nào?",
     answer:
-      "Bạn có thể đổi trả sản phẩm trong vòng 7 ngày kể từ ngày nhận hàng nếu sản phẩm bị hư hỏng, không đúng mô tả, hoặc không đạt chất lượng. Vui lòng liên hệ bộ phận hỗ trợ để được xử lý.",
+      "Chúng tôi tiếp nhận khiếu nại trong vòng 24 giờ sau khi nhận hàng. Đổi/trả miễn phí nếu hàng dập, hỏng hoặc sai sản phẩm. Hoàn tiền 100% nếu không đạt chất lượng. Vui lòng gửi ảnh minh chứng để được xử lý nhanh nhất.",
   },
   {
     question: "Làm sao để trở thành khách hàng thân thiết?",
@@ -47,7 +47,7 @@ const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Tôi có thể bán hàng trên nền tảng không?",
     answer:
-      'Có! Nông Sản Việt là nền tảng D2C kết nối nông dân với người tiêu dùng. Bạn có thể đăng ký vai trò "Người Bán Hàng" để quản lý sản phẩm, theo dõi đơn hàng và xem phân tích doanh thu.',
+      'Có! NOSAVI là nền tảng D2C kết nối nông dân với người tiêu dùng. Bạn có thể đăng ký vai trò "Người Bán Hàng" để quản lý sản phẩm, theo dõi đơn hàng và xem phân tích doanh thu.',
   },
 ];
 
@@ -103,7 +103,7 @@ export function Contact() {
         <h1 className="text-foreground mb-2">Liên Hệ Với Chúng Tôi</h1>
         <p className="text-muted-foreground max-w-2xl mx-auto">
           Bạn có câu hỏi, góp ý, hoặc cần hỗ trợ? Hãy liên hệ với đội ngũ
-          Nông Sản Việt — chúng tôi luôn sẵn sàng giúp đỡ.
+          NOSAVI — chúng tôi luôn sẵn sàng giúp đỡ.
         </p>
       </div>
 

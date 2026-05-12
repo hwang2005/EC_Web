@@ -165,9 +165,9 @@ export function Auth() {
           <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center shadow-lg">
             <Sprout className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Nông Sản Việt</h1>
+          <h1 className="text-2xl font-bold text-foreground">NOSAVI</h1>
           <p className="text-sm text-muted-foreground">
-            Thương Mại Điện Tử Nông Sản Việt
+            Thương Mại Điện Tử NOSAVI
           </p>
         </Link>
       </div>

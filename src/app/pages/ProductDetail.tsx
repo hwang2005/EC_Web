@@ -317,7 +317,7 @@ export function ProductDetail() {
             </div>
             <div className="flex items-center gap-3 text-muted-foreground">
               <Star className="w-5 h-5 text-primary" />
-              <span>Đổi trả trong 7 ngày nếu không hài lòng</span>
+              <span>Tiếp nhận khiếu nại trong 24 giờ sau giao hàng</span>
             </div>
           </div>
         </div>
