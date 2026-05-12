@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
@@ -8,9 +8,93 @@ import { ShippingAddress, DeliveryOption, Order, Voucher } from "../types";
 import { CreditCard, Truck, ShieldCheck, Lock, AlertTriangle, Clock, MessageSquare, RefreshCw, Tag, CheckCircle2, XCircle, Info, MapPin } from "lucide-react";
 import { toast } from "sonner";
 
+const SHIPPING_DISTANCE_CACHE_KEY = "shipping_distance_cache_v1";
+const GEOCODE_TIMEOUT_MS = 1200;
+const PAYMENT_PROCESSING_DELAY_MS = 150;
+
+function normalizeAddressPart(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function getDistanceCacheKey(ward: string, province: string) {
+  return `${normalizeAddressPart(ward)}|${normalizeAddressPart(province)}`;
+}
+
+function readDistanceCache(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(SHIPPING_DISTANCE_CACHE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function writeDistanceCache(key: string, distanceKm: number) {
+  const cache = readDistanceCache();
+  cache[key] = distanceKm;
+  localStorage.setItem(SHIPPING_DISTANCE_CACHE_KEY, JSON.stringify(cache));
+}
+
+function getCachedDistanceKm(ward: string, province: string): number | null {
+  const cached = readDistanceCache()[getDistanceCacheKey(ward, province)];
+  return Number.isFinite(cached) ? cached : null;
+}
+
+function estimateDistanceKm(province: string): number {
+  const normalizedProvince = normalizeAddressPart(province);
+  if (!normalizedProvince) return 10;
+  if (
+    normalizedProvince.includes("hồ chí minh") ||
+    normalizedProvince.includes("ho chi minh") ||
+    normalizedProvince.includes("hcm")
+  ) {
+    return 12;
+  }
+  return 300;
+}
+
+function calculateHaversineDistanceKm(userLat: number, userLon: number) {
+  const storeLat = 10.7732;
+  const storeLon = 106.7027;
+  const earthRadiusKm = 6371;
+  const dLat = ((userLat - storeLat) * Math.PI) / 180;
+  const dLon = ((userLon - storeLon) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((storeLat * Math.PI) / 180) *
+      Math.cos((userLat * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
+}
+
+async function fetchDistanceKm(ward: string, province: string): Promise<number | null> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), GEOCODE_TIMEOUT_MS);
+
+  try {
+    const q = encodeURIComponent(`${ward}, ${province}, Vietnam`);
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}`, {
+      signal: controller.signal,
+    });
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+
+    const userLat = parseFloat(data[0].lat);
+    const userLon = parseFloat(data[0].lon);
+    if (!Number.isFinite(userLat) || !Number.isFinite(userLon)) return null;
+
+    return calculateHaversineDistanceKm(userLat, userLon);
+  } catch {
+    return null;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 export function Checkout() {
   const { role } = useAuth();
-  const { cart, orders, getCartTotal, placeOrder, validateVoucher, applyVoucher } = useShop();
+  const { cart, orders, placeOrder, validateVoucher, applyVoucher } = useShop();
   const navigate = useNavigate();
   
   const [step, setStep] = useState(1); // 1: Shipping, 2: Delivery, 3: Payment
@@ -62,16 +146,20 @@ export function Checkout() {
   } | null>(null);
 
   const currentUserEmail = localStorage.getItem("current_user_email") || "";
-  const pastAddresses = Array.from(
-    new Map(
-      orders
-        .filter(o => o.buyerEmail === currentUserEmail)
-        .map(o => [
-          o.shippingAddress.address + o.shippingAddress.province, 
-          o.shippingAddress
-        ])
-    ).values()
-  ).slice(0, 5);
+  const pastAddresses = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          orders
+            .filter((o) => o.buyerEmail === currentUserEmail)
+            .map((o) => [
+              o.shippingAddress.address + o.shippingAddress.province,
+              o.shippingAddress,
+            ]),
+        ).values(),
+      ).slice(0, 5),
+    [currentUserEmail, orders],
+  );
 
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryOption>(DELIVERY_OPTIONS[0]);
   const [selectedPayment, setSelectedPayment] = useState(PAYMENT_METHODS[0].id);
@@ -93,17 +181,24 @@ export function Checkout() {
   const [appliedVoucher, setAppliedVoucher] = useState<Voucher | null>(null);
   const [voucherError, setVoucherError] = useState("");
   const [voucherSuccess, setVoucherSuccess] = useState("");
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
-  const subtotal = getCartTotal();
+  const subtotal = useMemo(
+    () => cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
+    [cart],
+  );
 
   // Compute voucher discount
-  const cartCategories = [...new Set(cart.map((item) => item.product.category))];
-  const computeVoucherDiscount = (voucher: Voucher | null): number => {
+  const cartCategories = useMemo(
+    () => [...new Set(cart.map((item) => item.product.category))],
+    [cart],
+  );
+  const computeVoucherDiscount = useCallback((voucher: Voucher | null): number => {
     if (!voucher) return 0;
     if (voucher.discountType === "fixed") return voucher.discountValue;
     const pctOff = subtotal * (voucher.discountValue / 100);
     return voucher.maxDiscountAmount ? Math.min(pctOff, voucher.maxDiscountAmount) : pctOff;
-  };
+  }, [subtotal]);
   const voucherDiscount = computeVoucherDiscount(appliedVoucher);
 
   const tax = subtotal * 0.1;
@@ -111,7 +206,10 @@ export function Checkout() {
   const total = subtotal - voucherDiscount + tax + deliveryFee;
 
   // Check if cart has perishable items
-  const hasPerishableItems = cart.some((item) => item.product.isPerishable);
+  const hasPerishableItems = useMemo(
+    () => cart.some((item) => item.product.isPerishable),
+    [cart],
+  );
 
   if (role !== "consumer") {
     navigate("/auth");
@@ -180,7 +278,7 @@ export function Checkout() {
    * - deliveryOpt: phương thức vận chuyển được chọn
    * - useCache: true → dùng khoảng cách GPS đã cache, false → gọi API mới
    */
-  const calculateDynamicShippingFee = async (
+  const calculateDynamicShippingFee = useCallback(async (
     deliveryOpt: DeliveryOption = selectedDelivery,
     useCache: boolean = false
   ) => {
@@ -192,54 +290,48 @@ export function Checkout() {
     }
 
     const cartItemsCount = cart.reduce((acc, curr) => acc + curr.quantity, 0);
-    let distanceKm = useCache && cachedDistanceKm !== null ? cachedDistanceKm : 10;
+    const cachedLocalDistance = getCachedDistanceKm(shippingAddress.ward, shippingAddress.province);
+    const initialDistanceKm =
+      useCache && cachedDistanceKm !== null
+        ? cachedDistanceKm
+        : cachedLocalDistance ?? estimateDistanceKm(shippingAddress.province);
 
-    if (!useCache || cachedDistanceKm === null) {
-      try {
-        const q = encodeURIComponent(`${shippingAddress.ward}, ${shippingAddress.province}, Vietnam`);
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}`);
-        const data = await res.json();
-        if (data && data.length > 0) {
-          const storeLat = 10.7732;
-          const storeLon = 106.7027;
-          const userLat = parseFloat(data[0].lat);
-          const userLon = parseFloat(data[0].lon);
+    const applyFee = (nextDistanceKm: number) => {
+      const ratePerKm = 500;
+      const weightBuffer = cartItemsCount * 2000;
+      const surcharge = nextDistanceKm > 100 ? 25000 : nextDistanceKm > 30 ? 10000 : 0;
+      const baseFee = deliveryOpt.price;
+      const distanceFee = Math.round(nextDistanceKm) * ratePerKm;
+      const totalFee = baseFee + distanceFee + weightBuffer + surcharge;
 
-          const R = 6371;
-          const dLat = (userLat - storeLat) * Math.PI / 180;
-          const dLon = (userLon - storeLon) * Math.PI / 180;
-          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                    Math.cos(storeLat * Math.PI / 180) * Math.cos(userLat * Math.PI / 180) *
-                    Math.sin(dLon/2) * Math.sin(dLon/2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-          distanceKm = R * c;
-        } else {
-          if (!shippingAddress.province.toLowerCase().includes("hồ chí minh")) distanceKm = 300;
-        }
-      } catch (err) {
-        if (!shippingAddress.province.toLowerCase().includes("hồ chí minh")) distanceKm = 300;
-      }
-      setCachedDistanceKm(distanceKm);
+      setShippingBreakdown({
+        baseFee,
+        distanceFee,
+        weightFee: weightBuffer,
+        surcharge,
+        distanceKm: Math.round(nextDistanceKm),
+        itemCount: cartItemsCount,
+      });
+      setDynamicDeliveryFee(totalFee);
+    };
+
+    applyFee(initialDistanceKm);
+    setCachedDistanceKm(initialDistanceKm);
+
+    if (cachedLocalDistance === null && !useCache) {
+      fetchDistanceKm(shippingAddress.ward, shippingAddress.province).then((freshDistanceKm) => {
+        if (freshDistanceKm === null) return;
+        writeDistanceCache(
+          getDistanceCacheKey(shippingAddress.ward, shippingAddress.province),
+          freshDistanceKm,
+        );
+        setCachedDistanceKm(freshDistanceKm);
+        applyFee(freshDistanceKm);
+      });
     }
 
-    const ratePerKm = 500;
-    const weightBuffer = cartItemsCount * 2000;
-    const surcharge = distanceKm > 100 ? 25000 : distanceKm > 30 ? 10000 : 0; 
-    
-    const baseFee = deliveryOpt.price;
-    const distanceFee = Math.round(distanceKm) * ratePerKm;
-    const totalFee = baseFee + distanceFee + weightBuffer + surcharge;
-
-    setShippingBreakdown({
-      baseFee,
-      distanceFee,
-      weightFee: weightBuffer,
-      surcharge,
-      distanceKm: Math.round(distanceKm),
-      itemCount: cartItemsCount,
-    });
-    setDynamicDeliveryFee(totalFee);
-  };
+    return;
+  }, [cachedDistanceKm, cart, selectedDelivery, shippingAddress.province, shippingAddress.ward]);
 
   // Tự động tính lại phí khi đổi phương thức vận chuyển (step >= 2)
   useEffect(() => {
@@ -248,14 +340,11 @@ export function Checkout() {
     calculateDynamicShippingFee(selectedDelivery, true).finally(() =>
       setIsRecalculating(false)
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDelivery]);
+  }, [calculateDynamicShippingFee, selectedDelivery, step]);
 
-  const handleNext = async () => {
+  const handleNext = () => {
     if (step === 1 && validateShipping()) {
-      toast.loading("Đang tính phí vận chuyển...");
-      await calculateDynamicShippingFee(selectedDelivery, false);
-      toast.dismiss();
+      calculateDynamicShippingFee(selectedDelivery, false);
       setStep(2);
     } else if (step === 2) {
       setStep(3);
@@ -263,11 +352,11 @@ export function Checkout() {
   };
 
   const handlePlaceOrder = () => {
-    if (!validatePayment()) {
+    if (isPlacingOrder || !validatePayment()) {
       return;
     }
 
-    // Simulate payment processing
+    setIsPlacingOrder(true);
     toast.loading("Đang xử lý thanh toán...");
     
     setTimeout(() => {
@@ -304,7 +393,7 @@ export function Checkout() {
       toast.dismiss();
       toast.success("Đặt hàng thành công!");
       navigate("/orders");
-    }, 2000);
+    }, PAYMENT_PROCESSING_DELAY_MS);
   };
 
   return (
@@ -890,7 +979,8 @@ export function Checkout() {
                 </button>
                 <button
                   onClick={handlePlaceOrder}
-                  className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold"
+                  disabled={isPlacingOrder}
+                  className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   Đặt hàng
                 </button>
