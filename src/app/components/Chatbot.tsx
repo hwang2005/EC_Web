@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageCircle, X, Send, Bot, User, Sparkles, Cpu } from "lucide-react";
+import { MessageCircle, X, Send, Bot, User, Sparkles, Cpu, Zap, ChevronRight } from "lucide-react";
 import { useShop } from "../context/ShopContext";
 import {
   CUSTOMER_TIERS,
@@ -13,7 +13,9 @@ interface Message {
   text: string;
   sender: "user" | "bot";
   timestamp: Date;
-  mode?: "ai" | "rule" | "error";
+  mode?: "ai" | "smart" | "rule" | "error";
+  confidence?: number;
+  suggestions?: string[];
 }
 
 /* ───────────── Rule-Based Fallback Logic (Enhanced) ───────────── */
@@ -143,7 +145,7 @@ export function Chatbot() {
   useEffect(() => {
     fetch("/api/health", { signal: AbortSignal.timeout(3000) })
       .then((r) => r.json())
-      .then((data) => setAiAvailable(data.status === "ok" && data.openai_configured))
+      .then((data) => setAiAvailable(data.status === "ok" && (data.openai_configured || data.smart_configured)))
       .catch(() => setAiAvailable(false));
   }, []);
 
@@ -243,7 +245,7 @@ export function Chatbot() {
   }, [products, cart, customerTier, getPersonalizedPrice, vouchers, storeProfile]);
 
   /* ── AI Response via Backend ── */
-  const fetchAIResponse = useCallback(async (userMessage: string, history: Message[]): Promise<{ text: string; mode: "ai" | "rule" | "error" }> => {
+  const fetchAIResponse = useCallback(async (userMessage: string, history: Message[]): Promise<{ text: string; mode: "ai" | "smart" | "rule" | "error"; confidence?: number; suggestions?: string[] }> => {
     try {
       const chatHistory = history
         .filter((m) => m.id !== "welcome")
@@ -259,9 +261,16 @@ export function Chatbot() {
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      return { text: data.reply, mode: data.mode === "error" ? "error" : "ai" };
+
+      // Backend returns mode: "fallback" when smart mode has no good answer
+      if (data.mode === "fallback" || !data.reply) {
+        return { text: getBotResponse(userMessage), mode: "rule", suggestions: data.suggestions };
+      }
+
+      const mode = data.mode === "error" ? "error" : data.mode === "smart" ? "smart" : "ai";
+      return { text: data.reply, mode, confidence: data.confidence, suggestions: data.suggestions };
     } catch {
-      // Fallback to rule-based
+      // Network/server down: pure rule-based
       return { text: getBotResponse(userMessage), mode: "rule" };
     }
   }, [getBotResponse]);
@@ -292,6 +301,8 @@ export function Chatbot() {
         sender: "bot",
         timestamp: new Date(),
         mode: result.mode,
+        confidence: result.confidence,
+        suggestions: result.suggestions,
       }]);
     } else {
       // Rule-based with slight delay for natural feel
@@ -315,8 +326,32 @@ export function Chatbot() {
     }
   };
 
-  const modeLabel = aiAvailable === true ? "AI (RAG)" : aiAvailable === false ? "Rule-based" : "Đang kiểm tra...";
+  const modeLabel = aiAvailable === true ? "AI / Smart" : aiAvailable === false ? "Rule-based" : "Đang kiểm tra...";
   const ModeIcon = aiAvailable ? Sparkles : Cpu;
+
+  /* Helper: render confidence badge */
+  const renderConfidenceBadge = (confidence?: number) => {
+    if (confidence === undefined || confidence <= 0) return null;
+    const color = confidence >= 0.7 ? "text-emerald-500" : confidence >= 0.4 ? "text-amber-500" : "text-red-400";
+    const label = confidence >= 0.7 ? "Độ tin cậy cao" : confidence >= 0.4 ? "Độ tin cậy trung bình" : "Độ tin cậy thấp";
+    return <span className={`text-xs ${color} ml-1`} title={label}>●</span>;
+  };
+
+  /* Helper: render markdown-ish text */
+  const renderFormattedText = (text: string) => {
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={i}>{part.slice(2, -2)}</strong>;
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
+  /* Handle suggestion chip click */
+  const handleSuggestionClick = (suggestion: string) => {
+    setInputText(suggestion);
+  };
 
   return (
     <>
@@ -356,35 +391,58 @@ export function Chatbot() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background">
             {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex gap-2 ${message.sender === "user" ? "justify-end" : "justify-start"}`}
-              >
-                {message.sender === "bot" && (
-                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-5 h-5 text-white" />
-                  </div>
-                )}
+              <div key={message.id} className="flex flex-col">
                 <div
-                  className={`max-w-[78%] p-3 rounded-lg ${
-                    message.sender === "user"
-                      ? "bg-primary text-white"
-                      : "bg-white border border-border"
-                  }`}
+                  className={`flex gap-2 ${message.sender === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  <p className="text-sm whitespace-pre-line">{message.text}</p>
-                  <div className={`flex items-center gap-1 mt-1 ${message.sender === "user" ? "text-white/70" : "text-muted-foreground"}`}>
-                    <p className="text-xs">
-                      {message.timestamp.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                    {message.sender === "bot" && message.mode === "ai" && (
-                      <Sparkles className="w-3 h-3 text-amber-500" />
-                    )}
+                  {message.sender === "bot" && (
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-5 h-5 text-white" />
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[78%] p-3 rounded-lg ${
+                      message.sender === "user"
+                        ? "bg-primary text-white"
+                        : "bg-white border border-border"
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-line">{renderFormattedText(message.text)}</p>
+                    <div className={`flex items-center gap-1 mt-1 ${message.sender === "user" ? "text-white/70" : "text-muted-foreground"}`}>
+                      <p className="text-xs">
+                        {message.timestamp.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                      {message.sender === "bot" && message.mode === "ai" && (
+                        <Sparkles className="w-3 h-3 text-amber-500" title="AI (RAG + LLM)" />
+                      )}
+                      {message.sender === "bot" && message.mode === "smart" && (
+                        <Zap className="w-3 h-3 text-blue-500" title="Smart (TF-IDF)" />
+                      )}
+                      {message.sender === "bot" && message.mode === "rule" && (
+                        <Cpu className="w-3 h-3 text-gray-400" title="Rule-based" />
+                      )}
+                      {message.sender === "bot" && renderConfidenceBadge(message.confidence)}
+                    </div>
                   </div>
+                  {message.sender === "user" && (
+                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
+                      <User className="w-5 h-5 text-foreground" />
+                    </div>
+                  )}
                 </div>
-                {message.sender === "user" && (
-                  <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
-                    <User className="w-5 h-5 text-foreground" />
+                {/* Suggestion chips */}
+                {message.sender === "bot" && message.suggestions && message.suggestions.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2 ml-10">
+                    {message.suggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleSuggestionClick(s)}
+                        className="text-xs px-3 py-1.5 rounded-full border border-primary/30 text-primary bg-primary/5 hover:bg-primary/15 transition-colors flex items-center gap-1"
+                      >
+                        <ChevronRight className="w-3 h-3" />
+                        {s}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>

@@ -61,16 +61,20 @@ class ChatResponse(BaseModel):
     reply: str
     sources: List[str] = []
     mode: str = "ai"
+    confidence: float = 1.0
+    suggestions: List[str] = []
 
 
 @app.get("/api/health")
 async def health():
     has_llama = rag_engine.refresh_provider_status() if rag_engine else False
     chunk_count = rag_engine.collection.count() if rag_engine else 0
+    smart_ready = rag_engine.smart_engine.is_ready if rag_engine else False
     return {
         "status": "ok",
         "openai_configured": has_llama,
         "llama_configured": has_llama,
+        "smart_configured": smart_ready,
         "knowledge_chunks": chunk_count,
     }
 
@@ -91,6 +95,8 @@ async def chat(request: ChatRequest):
         reply=result["reply"],
         sources=result.get("sources", []),
         mode=result.get("mode", "ai"),
+        confidence=result.get("confidence", 1.0),
+        suggestions=result.get("suggestions", []),
     )
 
 

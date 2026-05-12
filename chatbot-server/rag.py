@@ -23,6 +23,7 @@ from typing import Dict, List, Optional
 
 import chromadb
 from dotenv import load_dotenv
+from smart_engine import SmartEngine
 
 # Fix Windows console encoding
 if sys.stdout.encoding != "utf-8":
@@ -128,7 +129,13 @@ def _compute_content_hash(chunks: List[Dict]) -> str:
 
 
 class RAGEngine:
-    """Retrieval-Augmented Generation engine using ChromaDB + Ollama."""
+    """Retrieval-Augmented Generation engine using ChromaDB + Ollama.
+
+    Supports a 3-tier fallback chain:
+      1. AI mode  - Full RAG + Ollama LLM (best quality, requires Ollama)
+      2. Smart mode - TF-IDF knowledge retrieval (good quality, zero dependencies)
+      3. Error mode - Returns status messages when everything fails
+    """
 
     def __init__(self):
         self.ollama_base_url = OLLAMA_BASE_URL
@@ -142,6 +149,9 @@ class RAGEngine:
         self.provider_status_message = ""
         self.embedding_status_message = ""
         self._ollama_autostart_attempted = False
+
+        # Initialize the Smart Engine (TF-IDF based, always available)
+        self.smart_engine = SmartEngine()
 
         self.chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
         self.collection_name = "nong_san_viet"
@@ -471,14 +481,49 @@ class RAGEngine:
         query: str,
         chat_history: Optional[List[Dict]] = None,
     ) -> Dict:
-        """Generate a response using RAG: retrieve context then call Ollama."""
-        if not self.refresh_provider_status():
-            return {
-                "reply": self.provider_status_message,
-                "sources": [],
-                "mode": "error",
-            }
+        """Generate a response using the 3-tier fallback chain:
+        AI (RAG+Ollama) → Smart (TF-IDF) → Error.
 
+        Returns:
+            {
+                "reply": str,
+                "sources": List[str],
+                "mode": "ai" | "smart" | "error",
+                "confidence": float,
+                "suggestions": List[str],
+            }
+        """
+        # Tier 1: Try AI mode (RAG + Ollama)
+        if self.refresh_provider_status():
+            result = self._generate_ai(query, chat_history)
+            if result["mode"] != "error":
+                return result
+            # AI failed mid-request, fall through to Smart
+
+        # Tier 2: Smart mode (TF-IDF knowledge retrieval)
+        smart_result = self.smart_engine.query(
+            user_query=query,
+            chat_history=chat_history,
+        )
+        if smart_result["mode"] == "smart" and smart_result["reply"]:
+            print(f"[SMART] Answered with confidence {smart_result['confidence']:.2f}")
+            return smart_result
+
+        # Tier 3: Return fallback signal so the frontend uses its rule-based engine
+        return {
+            "reply": "",
+            "sources": [],
+            "mode": "fallback",
+            "confidence": 0.0,
+            "suggestions": smart_result.get("suggestions", []),
+        }
+
+    def _generate_ai(
+        self,
+        query: str,
+        chat_history: Optional[List[Dict]] = None,
+    ) -> Dict:
+        """Generate a response using full RAG pipeline with Ollama LLM."""
         try:
             context_chunks = self.retrieve(query, top_k=5)
         except Exception as exc:
@@ -488,6 +533,8 @@ class RAGEngine:
                 "reply": f"⚠️ Lỗi khi tạo vector embedding bằng Ollama: {exc}",
                 "sources": [],
                 "mode": "error",
+                "confidence": 0.0,
+                "suggestions": [],
             }
 
         context_text = "\n\n---\n\n".join(
@@ -538,8 +585,11 @@ class RAGEngine:
             self.has_llama = False
             self.has_openai = False
 
+        is_error = reply.startswith("⚠️")
         return {
             "reply": reply,
             "sources": sources,
-            "mode": "error" if reply.startswith("⚠️") else "ai",
+            "mode": "error" if is_error else "ai",
+            "confidence": 0.0 if is_error else 0.95,
+            "suggestions": [],
         }
