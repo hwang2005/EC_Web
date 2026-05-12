@@ -100,7 +100,7 @@ Notes:
 
 - The backend uses Ollama for both chat generation and vector embeddings.
 - By default, `.env.example` is configured with:
-  - `OLLAMA_BASE_URL=http://localhost:11434`
+  - `OLLAMA_BASE_URL=http://localhost:11436`
   - `OLLAMA_MODELS=YOUR DIRECTORY FOR OLLAMA MODELS`
   - `OLLAMA_MODEL=llama3`
   - `OLLAMA_EMBED_MODEL=llama3`

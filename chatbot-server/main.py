@@ -18,9 +18,10 @@ if sys.stderr.encoding != "utf-8":
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from rag import RAGEngine
+from rule_engine import get_rule_response
 
 app = FastAPI(
     title="Nong San Viet Chatbot API",
@@ -55,6 +56,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     history: List[ChatMessage] = []
+    shopContext: Optional[Dict[str, Any]] = None
 
 
 class ChatResponse(BaseModel):
@@ -82,14 +84,21 @@ async def health():
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     if not rag_engine:
+        rule_result = get_rule_response(request.message, request.shopContext)
         return ChatResponse(
-            reply="Server dang khoi dong, vui long thu lai sau.",
-            sources=[],
-            mode="error",
+            reply=rule_result["reply"],
+            sources=rule_result.get("sources", []),
+            mode=rule_result.get("mode", "rule"),
+            confidence=rule_result.get("confidence", 0.0),
+            suggestions=rule_result.get("suggestions", []),
         )
 
     history = [{"role": msg.role, "content": msg.content} for msg in request.history]
-    result = rag_engine.generate(query=request.message, chat_history=history)
+    result = rag_engine.generate(
+        query=request.message,
+        chat_history=history,
+        shop_context=request.shopContext,
+    )
 
     return ChatResponse(
         reply=result["reply"],

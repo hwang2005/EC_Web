@@ -23,6 +23,7 @@ from typing import Dict, List, Optional
 
 import chromadb
 from dotenv import load_dotenv
+from rule_engine import get_rule_response
 from smart_engine import SmartEngine
 
 # Fix Windows console encoding
@@ -37,7 +38,7 @@ KNOWLEDGE_DIR = Path(__file__).parent / "knowledge_base"
 CHROMA_DIR = Path(__file__).parent / "chroma_data"
 EMBEDDING_PROVIDER = "ollama"
 
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11436").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
 OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", OLLAMA_MODEL)
 OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))
@@ -480,15 +481,16 @@ class RAGEngine:
         self,
         query: str,
         chat_history: Optional[List[Dict]] = None,
+        shop_context: Optional[Dict] = None,
     ) -> Dict:
         """Generate a response using the 3-tier fallback chain:
-        AI (RAG+Ollama) → Smart (TF-IDF) → Error.
+        AI (RAG+Ollama) → Smart (TF-IDF) → Rule-based.
 
         Returns:
             {
                 "reply": str,
                 "sources": List[str],
-                "mode": "ai" | "smart" | "error",
+                "mode": "ai" | "smart" | "rule" | "error",
                 "confidence": float,
                 "suggestions": List[str],
             }
@@ -509,14 +511,11 @@ class RAGEngine:
             print(f"[SMART] Answered with confidence {smart_result['confidence']:.2f}")
             return smart_result
 
-        # Tier 3: Return fallback signal so the frontend uses its rule-based engine
-        return {
-            "reply": "",
-            "sources": [],
-            "mode": "fallback",
-            "confidence": 0.0,
-            "suggestions": smart_result.get("suggestions", []),
-        }
+        # Tier 3: Rule-based fallback owned by the chatbot server.
+        rule_result = get_rule_response(query, shop_context)
+        if smart_result.get("suggestions"):
+            rule_result["suggestions"] = smart_result["suggestions"]
+        return rule_result
 
     def _generate_ai(
         self,
