@@ -361,7 +361,7 @@ export function Products() {
                   <h3 className="font-semibold group-hover:text-primary transition-colors">
                     {product.name}
                   </h3>
-                  <span className="text-xs text-foreground bg-accent px-2 py-1 rounded">
+                  <span className="text-xs text-foreground bg-accent px-2 py-1 rounded whitespace-nowrap text-right flex-shrink-0">
                     {product.category}
                   </span>
                 </div>

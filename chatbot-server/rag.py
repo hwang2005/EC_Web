@@ -38,7 +38,7 @@ KNOWLEDGE_DIR = Path(__file__).parent / "knowledge_base"
 CHROMA_DIR = Path(__file__).parent / "chroma_data"
 EMBEDDING_PROVIDER = "ollama"
 
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11436").rstrip("/")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
 OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", OLLAMA_MODEL)
 OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))

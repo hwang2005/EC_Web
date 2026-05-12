@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import type { KeyboardEvent } from "react";
 import { MessageCircle, X, Send, Bot, User, Sparkles, Cpu, Zap, ChevronRight } from "lucide-react";
 import { useShop } from "../context/ShopContext";
+import type { CartItem, Product, StoreProfile, Voucher } from "../types";
+import type { CustomerTier } from "../data/products";
 
 interface Message {
   id: string;
@@ -22,6 +24,221 @@ interface ChatApiResult {
 
 const CHAT_API = "/api/chat";
 
+interface ShopContextSnapshot {
+  products: Product[];
+  cart: CartItem[];
+  customerTier: CustomerTier;
+  vouchers: Voucher[];
+  storeProfile: StoreProfile;
+}
+
+const FALLBACK_SUGGESTIONS = [
+  "Giá gạo ST25 bao nhiêu?",
+  "Có voucher nào không?",
+  "Phí giao hàng bao nhiêu?",
+];
+
+const TIER_INFO: Record<CustomerTier, { name: string; discount: number }> = {
+  standard: { name: "Khách hàng thường", discount: 0 },
+  silver: { name: "Khách hàng Bạc", discount: 5 },
+  gold: { name: "Khách hàng Vàng", discount: 10 },
+  platinum: { name: "Khách hàng Kim Cương", discount: 15 },
+};
+
+const PRODUCT_ALIASES: Record<string, string[]> = {
+  "1": ["gao", "rice", "st25"],
+  "2": ["ca phe", "coffee", "robusta", "dak lak"],
+  "3": ["thanh long", "dragon fruit"],
+  "4": ["ho tieu", "tieu", "pepper", "phu quoc"],
+  "5": ["chom chom", "rambutan"],
+  "6": ["rau", "rau cu", "rau huu co", "vegetable", "organic"],
+  "7": ["xoai", "mango", "hoa loc"],
+  "8": ["nuoc mam", "fish sauce"],
+  "9": ["lua mach", "ngu coc", "grain"],
+  "10": ["mang kho", "mang", "specialty"],
+  "11": ["tra xanh", "thai nguyen", "tea"],
+  "12": ["buoi", "pomelo", "da xanh"],
+};
+
+function normalizeText(value: string) {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function formatCurrency(value: number) {
+  return `${Math.round(value).toLocaleString("vi-VN")}đ`;
+}
+
+function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  return fetch(url, {
+    ...options,
+    signal: controller.signal,
+  }).finally(() => window.clearTimeout(timeoutId));
+}
+
+function getPersonalizedPrice(price: number, tier: CustomerTier) {
+  return price * (1 - TIER_INFO[tier].discount / 100);
+}
+
+function getCategoryName(category: string) {
+  return (category || "").split("(")[0].trim();
+}
+
+function productKeywords(product: Product) {
+  const productWords = normalizeText(`${product.name} ${product.category}`)
+    .split(" ")
+    .filter((word) => word.length > 2 && word !== "tra");
+
+  return [...productWords, ...(PRODUCT_ALIASES[product.id] || [])].map(normalizeText);
+}
+
+function findProductsByMessage(message: string, products: Product[]) {
+  return products.filter((product) => {
+    const productName = normalizeText(product.name);
+    return (
+      (productName && message.includes(productName)) ||
+      productKeywords(product).some((keyword) => keyword.length >= 3 && message.includes(keyword))
+    );
+  }).slice(0, 4);
+}
+
+function formatProductSummary(product: Product, tier: CustomerTier) {
+  const personalizedPrice = getPersonalizedPrice(product.price, tier);
+  const certification = product.certification?.join(", ") || "Chưa cập nhật";
+
+  return [
+    `**${product.name}**`,
+    `Giá: ${formatCurrency(personalizedPrice)} / ${product.unit || "sản phẩm"}${personalizedPrice < product.price ? ` (giá gốc ${formatCurrency(product.price)})` : ""}`,
+    `Danh mục: ${getCategoryName(product.category)} | Còn: ${product.stock}`,
+    `Xuất xứ: ${product.origin || "Chưa cập nhật"} | Chứng nhận: ${certification}`,
+    product.isPerishable ? `Bảo quản: ${product.storageInstructions || "Tham khảo bao bì"}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+function formatProductList(products: Product[], tier: CustomerTier) {
+  return products.slice(0, 5).map((product, index) => (
+    `${index + 1}. ${product.name} - ${formatCurrency(getPersonalizedPrice(product.price, tier))} / ${product.unit || "sp"} (rating ${product.rating})`
+  )).join("\n");
+}
+
+function messageHasAny(message: string, keywords: string[]) {
+  return keywords.some((keyword) => {
+    const normalized = normalizeText(keyword);
+    return normalized.includes(" ") ? message.includes(normalized) : message.split(" ").includes(normalized);
+  });
+}
+
+function getLocalFallbackResponse(userMessage: string, context: ShopContextSnapshot): ChatApiResult {
+  const message = normalizeText(userMessage);
+  const matchedProducts = findProductsByMessage(message, context.products);
+  const tier = TIER_INFO[context.customerTier];
+  const activeVouchers = context.vouchers.filter((voucher) => voucher.isActive);
+
+  let text: string;
+  let confidence = 0.65;
+
+  if (messageHasAny(message, ["xin chao", "chao", "hello", "hi"])) {
+    text = "Chào bạn! Tôi có thể hỗ trợ tra cứu sản phẩm, giá, tồn kho, nguồn gốc, giao hàng, thanh toán, voucher và hạng thành viên.";
+  } else if (matchedProducts.length > 0) {
+    const product = matchedProducts[0];
+
+    if (messageHasAny(message, ["gia", "bao nhieu", "price", "tien"])) {
+      const personalizedPrice = getPersonalizedPrice(product.price, context.customerTier);
+      text = `${product.name}: ${formatCurrency(personalizedPrice)} / ${product.unit || "sản phẩm"}\n${
+        tier.discount > 0
+          ? `Hạng ${tier.name} giảm ${tier.discount}% (giá gốc ${formatCurrency(product.price)})`
+          : "Giá chưa bao gồm VAT 10%"
+      }`;
+    } else if (messageHasAny(message, ["con hang", "ton kho", "het hang", "so luong", "stock"])) {
+      text = `${product.name}: ${product.stock > 0 ? `Còn ${product.stock} ${product.unit || "sản phẩm"}` : "Tạm hết hàng"}`;
+    } else if (messageHasAny(message, ["xuat xu", "nguon goc", "o dau", "nong trai", "chung nhan"])) {
+      text = [
+        product.name,
+        `Xuất xứ: ${product.origin || "Chưa cập nhật"}`,
+        `Chứng nhận: ${product.certification?.join(", ") || "Chưa cập nhật"}`,
+        `Mã lô: ${product.batchCode || "N/A"}`,
+        `Thu hoạch: ${product.harvestDate || "N/A"}`,
+      ].join("\n");
+    } else if (messageHasAny(message, ["bao quan", "han su dung", "giu tuoi"])) {
+      text = [
+        product.name,
+        `Hạn sử dụng: ${product.shelfLife || "Chưa cập nhật"}`,
+        `Bảo quản: ${product.storageInstructions || "Chưa cập nhật"}`,
+      ].join("\n");
+    } else {
+      text = matchedProducts.length > 1
+        ? `Tìm thấy ${matchedProducts.length} sản phẩm liên quan:\n\n${matchedProducts.map((item) => formatProductSummary(item, context.customerTier)).join("\n\n")}`
+        : formatProductSummary(product, context.customerTier);
+    }
+  } else if (messageHasAny(message, ["san pham", "mat hang", "ban gi", "nong san"])) {
+    const categories = Array.from(new Set(context.products.map((product) => getCategoryName(product.category)).filter(Boolean)));
+    const featured = [...context.products].sort((a, b) => b.rating - a.rating);
+    text = `Hiện có ${context.products.length} sản phẩm, nhóm: ${categories.join(", ")}\nNổi bật:\n${formatProductList(featured, context.customerTier)}`;
+  } else if (messageHasAny(message, ["gia", "bao nhieu", "price", "tien"])) {
+    text = `Hạng ${tier.name} được giảm ${tier.discount}%.\nNhập tên sản phẩm để xem giá, ví dụ: giá gạo ST25.\n${formatProductList(context.products, context.customerTier)}`;
+  } else if (messageHasAny(message, ["giao hang", "van chuyen", "ship", "delivery", "phi ship"])) {
+    text = [
+      "Phương thức giao hàng:",
+      "- Giao hàng tiêu chuẩn: 25.000đ - 3-5 ngày làm việc",
+      "- Giao hàng nhanh: 50.000đ - 1-2 ngày làm việc",
+      "- Giao trong ngày: 80.000đ - khu vực nội thành",
+      "- Miễn phí vận chuyển: đơn từ 500.000đ",
+    ].join("\n");
+  } else if (messageHasAny(message, ["thanh toan", "payment", "cod", "momo", "chuyen khoan"])) {
+    text = "Thanh toán: thẻ tín dụng/ghi nợ, MoMo, chuyển khoản ngân hàng hoặc COD. Giá chưa bao gồm VAT 10%.";
+  } else if (messageHasAny(message, ["khuyen mai", "giam gia", "voucher", "coupon", "sale"])) {
+    text = activeVouchers.length > 0
+      ? `Voucher đang hoạt động:\n${activeVouchers.slice(0, 6).map((voucher) => `- ${voucher.code}: ${voucher.description} (đơn từ ${formatCurrency(voucher.minOrderValue)})`).join("\n")}`
+      : "Hiện chưa có voucher. Ưu đãi hạng thành viên vẫn được áp dụng tự động.";
+  } else if (messageHasAny(message, ["hang", "thanh vien", "bac", "vang", "kim cuong", "diem", "loyalty"])) {
+    text = [
+      `Hạng hiện tại: ${tier.name} (giảm ${tier.discount}%)`,
+      "Mốc thăng hạng:",
+      "- Bạc: từ 1.000.000đ",
+      "- Vàng: từ 5.000.000đ",
+      "- Kim Cương: từ 15.000.000đ",
+    ].join("\n");
+  } else if (messageHasAny(message, ["gio hang", "cart", "don hang", "mua hang"])) {
+    if (context.cart.length === 0) {
+      text = "Giỏ hàng trống. Vào trang Sản Phẩm để mua sắm nhé.";
+    } else {
+      const total = context.cart.reduce((sum, item) => (
+        sum + getPersonalizedPrice(item.product.price, context.customerTier) * item.quantity
+      ), 0);
+      text = `Giỏ hàng (${context.cart.reduce((sum, item) => sum + item.quantity, 0)} SP):\n${
+        context.cart.map((item) => `- ${item.product.name} x${item.quantity}: ${formatCurrency(getPersonalizedPrice(item.product.price, context.customerTier) * item.quantity)}`).join("\n")
+      }\nTạm tính: ${formatCurrency(total)} (chưa VAT và ship)`;
+    }
+  } else if (messageHasAny(message, ["tro giup", "ho tro", "help", "lien he", "hotline"])) {
+    text = [
+      `Liên hệ: ${context.storeProfile.shopName || "Nông Sản Việt"}`,
+      `Hotline: ${context.storeProfile.shopPhone || "0912 345 678"}`,
+      `Email: ${context.storeProfile.shopEmail || "seller@demo.com"}`,
+      "Hoặc hỏi tôi về sản phẩm, giá, giao hàng, thanh toán, voucher, hạng thành viên.",
+    ].join("\n");
+  } else {
+    confidence = 0;
+    text = "Tôi chưa hiểu rõ ý bạn. Bạn có thể hỏi về sản phẩm và giá, giao hàng, thanh toán, voucher, bảo quản, nguồn gốc hoặc hạng thành viên.";
+  }
+
+  return {
+    text,
+    mode: "rule",
+    confidence,
+    suggestions: FALLBACK_SUGGESTIONS,
+  };
+}
+
 export function Chatbot() {
   const { products, cart, customerTier, vouchers, storeProfile } = useShop();
   const [isOpen, setIsOpen] = useState(false);
@@ -40,7 +257,7 @@ export function Chatbot() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch("/api/health", { signal: AbortSignal.timeout(3000) })
+    fetchWithTimeout("/api/health", {}, 3000)
       .then((r) => r.json())
       .then((data) => setServerAvailable(data.status === "ok"))
       .catch(() => setServerAvailable(false));
@@ -68,7 +285,7 @@ export function Chatbot() {
         .slice(-10)
         .map((m) => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text }));
 
-      const res = await fetch(CHAT_API, {
+      const res = await fetchWithTimeout(CHAT_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -76,8 +293,7 @@ export function Chatbot() {
           history: chatHistory,
           shopContext: buildShopContext(),
         }),
-        signal: AbortSignal.timeout(15000),
-      });
+      }, 15000);
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -100,10 +316,7 @@ export function Chatbot() {
       };
     } catch {
       setServerAvailable(false);
-      return {
-        text: "Không thể kết nối tới chatbot-server. Vui lòng khởi động backend chatbot rồi thử lại.",
-        mode: "error",
-      };
+      return getLocalFallbackResponse(userMessage, buildShopContext());
     }
   }, [buildShopContext]);
 
