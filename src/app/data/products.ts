@@ -208,7 +208,7 @@ export const PRODUCTS: Product[] = [
     name: "Trà Xanh Thái Nguyên",
     description: "Tuyệt phẩm trà chiều! Trà xanh Thái Nguyên chát dịu, hậu ngọt thanh, hương cốm non thoang thoảng mang lại phút giây an yên.",
     price: 200000,
-    image: "https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=500&q=80",
+    image: "https://media.tabfarm.vn/2024/11/Tra-xanh-thai-nguyen-tabfarm-4-1024x768.jpg?w=500&q=80",
     category: "Trà (Tea)",
     stock: 175,
     rating: 4.9,
