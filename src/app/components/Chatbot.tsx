@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { KeyboardEvent } from "react";
-import { MessageCircle, X, Send, Bot, User, Sparkles, Cpu, Zap, ChevronRight } from "lucide-react";
+import { MessageCircle, X, Send, Bot, User, Sparkles, Cpu, Zap, ChevronRight, Wifi, WifiOff } from "lucide-react";
 import { useShop } from "../context/ShopContext";
 import type { CartItem, Product, StoreProfile, Voucher } from "../types";
 import type { CustomerTier } from "../data/products";
@@ -243,7 +243,19 @@ export function Chatbot() {
   const { products, cart, customerTier, vouchers, storeProfile } = useShop();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [serverAvailable, setServerAvailable] = useState<boolean | null>(null);
+  const [serverInfo, setServerInfo] = useState<{
+    available: boolean | null;
+    engineLabel: string | null;
+    ollamaModel: string | null;
+    hasLlm: boolean;
+    hasSmart: boolean;
+  }>({
+    available: null,
+    engineLabel: null,
+    ollamaModel: null,
+    hasLlm: false,
+    hasSmart: false,
+  });
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -259,8 +271,20 @@ export function Chatbot() {
   useEffect(() => {
     fetchWithTimeout("/api/health", {}, 3000)
       .then((r) => r.json())
-      .then((data) => setServerAvailable(data.status === "ok"))
-      .catch(() => setServerAvailable(false));
+      .then((data) => {
+        if (data.status === "ok") {
+          setServerInfo({
+            available: true,
+            engineLabel: data.engine_label ?? null,
+            ollamaModel: data.ollama_model ?? null,
+            hasLlm: !!data.llama_configured,
+            hasSmart: !!data.smart_configured,
+          });
+        } else {
+          setServerInfo({ available: false, engineLabel: null, ollamaModel: null, hasLlm: false, hasSmart: false });
+        }
+      })
+      .catch(() => setServerInfo({ available: false, engineLabel: null, ollamaModel: null, hasLlm: false, hasSmart: false }));
   }, []);
 
   useEffect(() => {
@@ -298,7 +322,7 @@ export function Chatbot() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
-      setServerAvailable(true);
+      setServerInfo((prev) => ({ ...prev, available: true }));
 
       const mode = data.mode === "error"
         ? "error"
@@ -315,7 +339,7 @@ export function Chatbot() {
         suggestions: data.suggestions,
       };
     } catch {
-      setServerAvailable(false);
+      setServerInfo((prev) => ({ ...prev, available: false }));
       return getLocalFallbackResponse(userMessage, buildShopContext());
     }
   }, [buildShopContext]);
@@ -357,8 +381,27 @@ export function Chatbot() {
     }
   };
 
-  const modeLabel = serverAvailable === true ? "AI / Smart / Rule" : serverAvailable === false ? "Server offline" : "Đang kiểm tra...";
-  const ModeIcon = serverAvailable ? Sparkles : Cpu;
+  // Derive header badge info from serverInfo
+  const headerBadge = (() => {
+    if (serverInfo.available === null) {
+      return { label: "Đang kết nối...", icon: Cpu, color: "text-white/60", dot: "bg-white/40" };
+    }
+    if (!serverInfo.available) {
+      return { label: "Offline · Rule-based", icon: WifiOff, color: "text-white/80", dot: "bg-red-400" };
+    }
+    if (serverInfo.hasLlm && serverInfo.ollamaModel) {
+      return {
+        label: `Online · AI (${serverInfo.ollamaModel})`,
+        icon: Sparkles,
+        color: "text-amber-300",
+        dot: "bg-amber-400",
+      };
+    }
+    if (serverInfo.hasSmart) {
+      return { label: "Online · Smart Engine", icon: Zap, color: "text-sky-300", dot: "bg-sky-400" };
+    }
+    return { label: "Online · Rule-based", icon: Wifi, color: "text-emerald-300", dot: "bg-emerald-400" };
+  })();
 
   const renderConfidenceBadge = (confidence?: number) => {
     if (confidence === undefined || confidence <= 0) return null;
@@ -401,9 +444,10 @@ export function Chatbot() {
               <Bot className="w-6 h-6" />
               <div>
                 <h3 className="font-semibold">Trợ Lý NOSAVI</h3>
-                <p className="text-xs opacity-90 flex items-center gap-1">
-                  <ModeIcon className="w-3 h-3" />
-                  {modeLabel}
+                <p className={`text-xs flex items-center gap-1.5 mt-0.5 ${headerBadge.color}`}>
+                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${headerBadge.dot} animate-pulse`} />
+                  <headerBadge.icon className="w-3 h-3" />
+                  <span>{headerBadge.label}</span>
                 </p>
               </div>
             </div>
@@ -439,13 +483,22 @@ export function Chatbot() {
                         {message.timestamp.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
                       </p>
                       {message.sender === "bot" && message.mode === "ai" && (
-                        <Sparkles className="w-3 h-3 text-amber-500" title="AI (RAG + LLM)" />
+                        <span className="inline-flex items-center gap-0.5 text-xs text-amber-500 font-medium" title="Trả lời bằng AI · Offline LLM (Ollama)">
+                          <Sparkles className="w-3 h-3" />
+                          <span className="hidden sm:inline">AI offline</span>
+                        </span>
                       )}
                       {message.sender === "bot" && message.mode === "smart" && (
-                        <Zap className="w-3 h-3 text-blue-500" title="Smart (TF-IDF)" />
+                        <span className="inline-flex items-center gap-0.5 text-xs text-sky-500 font-medium" title="Trả lời bằng Smart Engine (TF-IDF · không cần mạng)">
+                          <Zap className="w-3 h-3" />
+                          <span className="hidden sm:inline">Smart</span>
+                        </span>
                       )}
                       {message.sender === "bot" && message.mode === "rule" && (
-                        <Cpu className="w-3 h-3 text-gray-400" title="Rule-based from chatbot-server" />
+                        <span className="inline-flex items-center gap-0.5 text-xs text-gray-400 font-medium" title="Trả lời bằng Rule-based (cục bộ)">
+                          <Cpu className="w-3 h-3" />
+                          <span className="hidden sm:inline">Rule</span>
+                        </span>
                       )}
                       {message.sender === "bot" && renderConfidenceBadge(message.confidence)}
                     </div>

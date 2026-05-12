@@ -72,12 +72,23 @@ async def health():
     has_llama = rag_engine.refresh_provider_status() if rag_engine else False
     chunk_count = rag_engine.collection.count() if rag_engine else 0
     smart_ready = rag_engine.smart_engine.is_ready if rag_engine else False
+
+    ollama_model = rag_engine.ollama_model if rag_engine else None
+    if has_llama:
+        engine_label = f"AI · {ollama_model}"
+    elif smart_ready:
+        engine_label = "Smart Engine (TF-IDF)"
+    else:
+        engine_label = "Rule-based"
+
     return {
         "status": "ok",
         "openai_configured": has_llama,
         "llama_configured": has_llama,
         "smart_configured": smart_ready,
         "knowledge_chunks": chunk_count,
+        "ollama_model": ollama_model,
+        "engine_label": engine_label,
     }
 
 
