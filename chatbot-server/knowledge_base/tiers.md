@@ -1,30 +1,27 @@
-# Hệ Thống Hạng Thành Viên - Nông Sản Việt
+# He thong hang thanh vien - Nong San Viet
 
-## Chương Trình Tích Điểm & Hạng Thành Viên
+## Hang va uu dai gia
 
-Hệ thống phân hạng tự động dựa trên tổng giá trị đơn hàng đã giao thành công.
+### Khách Hàng Thường (standard)
+- **Muc chi tieu:** Duoi 1.000.000 VND
+- **Uu dai gia:** Giam 0% tren tat ca san pham
+- **Mau hien thi:** gray
 
-### Hạng Khách Hàng Thường (Standard)
-- **Mức chi tiêu:** Dưới 1.000.000₫
-- **Ưu đãi giá:** Không giảm thêm (0%)
-- **Mô tả:** Hạng mặc định khi đăng ký tài khoản
+### Khách Hàng Bạc (silver)
+- **Muc chi tieu:** Tu 1.000.000 VND
+- **Uu dai gia:** Giam 5% tren tat ca san pham
+- **Mau hien thi:** slate
 
-### Hạng Bạc (Silver)
-- **Mức chi tiêu:** Từ 1.000.000₫
-- **Ưu đãi giá:** Giảm 5% trên tất cả sản phẩm
-- **Voucher riêng:** SILVER50K, COFFEE10
+### Khách Hàng Vàng (gold)
+- **Muc chi tieu:** Tu 5.000.000 VND
+- **Uu dai gia:** Giam 10% tren tat ca san pham
+- **Mau hien thi:** yellow
 
-### Hạng Vàng (Gold)
-- **Mức chi tiêu:** Từ 5.000.000₫
-- **Ưu đãi giá:** Giảm 10% trên tất cả sản phẩm
-- **Voucher riêng:** GOLD15, SPICE25K, SILVER50K, COFFEE10
+### Khách Hàng Kim Cương (platinum)
+- **Muc chi tieu:** Tu 15.000.000 VND
+- **Uu dai gia:** Giam 15% tren tat ca san pham
+- **Mau hien thi:** purple
 
-### Hạng Kim Cương (Platinum)
-- **Mức chi tiêu:** Từ 15.000.000₫
-- **Ưu đãi giá:** Giảm 15% trên tất cả sản phẩm
-- **Voucher riêng:** PLATINUM20 + tất cả voucher của hạng thấp hơn
-
-## Cách Tính Hạng
-- Hạng được tính tự động dựa trên tổng đơn đã giao thành công
-- Giá sản phẩm hiển thị đã được điều chỉnh theo hạng thành viên
-- Hạng được cập nhật ngay khi đơn hàng chuyển sang trạng thái "Đã giao"
+## Cach tinh hang
+- Hang duoc tinh theo tong gia tri don hang da giao thanh cong.
+- Gia san pham co the duoc ca nhan hoa theo phan tram giam cua hang thanh vien.
